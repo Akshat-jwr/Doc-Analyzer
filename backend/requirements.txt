@@ -1,0 +1,52 @@
+# Core Framework
+fastapi<0.100.0
+uvicorn[standard]==0.23.1
+python-multipart==0.0.6
+
+# Database
+sqlmodel==0.0.8
+asyncpg==0.28.0
+alembic==1.11.1
+psycopg2-binary==2.9.6
+
+# PDF Processing
+PyMuPDF==1.22.5
+pdf2image==1.16.3
+pytesseract==0.3.10
+pillow==10.0.0
+
+# Cloud Storage
+cloudinary==1.33.0
+
+# AI Integration
+google-generativeai==0.3.1
+
+# Utilities
+python-dotenv==1.0.0
+aiofiles==23.1.0
+pydantic==1.10.8
+tqdm==4.65.0
+requests==2.31.0
+
+# PDF Processing Components
+poppler-utils==0.1.0  # System dependency for pdf2image
+tesseract-ocr<5.3.0  # System dependency for pytesseract
+
+# Development Tools
+pytest==7.4.0
+pytest-asyncio==0.21.0
+black==23.3.0
+isort==5.12.0
+mypy==1.4.1
+
+# PDF Processing
+PyMuPDF==1.22.5
+pdf2image==1.16.3
+pytesseract==0.3.10
+pillow==10.0.0
+
+# Cloudinary
+cloudinary==1.33.0
+
+# Google AI
+google-generativeai==0.3.1
