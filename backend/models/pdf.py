@@ -1,7 +1,9 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from beanie import Document
+from pydantic import Field, ConfigDict
+from typing import Optional
 from datetime import datetime
 from enum import Enum
+from utils.pydantic_objectid import PyObjectId
 
 class ProcessingStatus(str, Enum):
     UPLOADED = "uploaded"
@@ -9,26 +11,26 @@ class ProcessingStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-class PDF(SQLModel, table=True):
-    __tablename__ = "pdfs"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+class PDF(Document):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    user_id: PyObjectId = Field(index=True)
     
     # Essential file info
-    filename: str = Field(max_length=500)
-    cloudinary_url: str = Field(max_length=1000)
-    page_count: int = Field(default=0)
+    filename: str
+    cloudinary_url: str
+    page_count: int = 0
     
     # Processing
-    processing_status: ProcessingStatus = Field(default=ProcessingStatus.UPLOADED)
+    processing_status: ProcessingStatus = ProcessingStatus.UPLOADED
     
     # Timestamps
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    user: Optional["User"] = Relationship(back_populates="pdfs")
-    page_texts: List["PageText"] = Relationship(back_populates="pdf", cascade_delete=True)
-    tables: List["Table"] = Relationship(back_populates="pdf", cascade_delete=True)
-    images: List["Image"] = Relationship(back_populates="pdf", cascade_delete=True)
-    chat_sessions: List["ChatSession"] = Relationship(back_populates="pdf")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={PyObjectId: str}
+    )
+    
+    class Settings:
+        collection = "pdfs"

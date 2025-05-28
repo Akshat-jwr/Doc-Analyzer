@@ -1,22 +1,27 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from beanie import Document
+from pydantic import Field, EmailStr, ConfigDict
+from typing import Optional
 from datetime import datetime
+from utils.pydantic_objectid import PyObjectId
 
-class User(SQLModel, table=True):
-    __tablename__ = "users"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    email: str = Field(unique=True, index=True, max_length=255)
-    username: str = Field(unique=True, index=True, max_length=100)
-    full_name: str = Field(max_length=200)
+class User(Document):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    email: EmailStr = Field(unique=True, index=True)
+    username: str = Field(unique=True, index=True)
+    full_name: str
     
     # Google Auth fields
-    google_id: Optional[str] = Field(unique=True, index=True, max_length=100)
-    profile_picture_url: Optional[str] = Field(max_length=1000)
+    google_id: Optional[str] = Field(default=None, unique=True, index=True)
+    profile_picture_url: Optional[str] = None
     
-    is_active: bool = Field(default=True)
+    is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    pdfs: List["PDF"] = Relationship(back_populates="user")
-    chat_sessions: List["ChatSession"] = Relationship(back_populates="user")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={PyObjectId: str}
+    )
+    
+    class Settings:
+        collection = "users"

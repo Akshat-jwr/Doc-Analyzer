@@ -1,60 +1,59 @@
 import logging
-from fastapi import FastAPI, Depends
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text
-from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from db.database import create_db_and_tables, get_session
-
-# CRITICAL: Import all models so SQLModel knows about them
-from models.user import User
-from models.pdf import PDF
-from models.page_text import PageText
-from models.table import Table
-from models.image import Image
-from models.chat_session import ChatSession
-from models.chat_message import ChatMessage
-
-app = FastAPI(title="Document Intelligence API")
+from db.database import connect_to_mongo, close_mongo_connection
+from endpoints import auth_router, health_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Create FastAPI app
+app = FastAPI(
+    title="Document Intelligence API",
+    description="API for document processing and analysis with AI",
+    version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Event handlers
 @app.on_event("startup")
-async def on_startup():
-    logger.info("Starting up and initializing the database...")
+async def startup_event():
+    """Initialize database on startup"""
+    logger.info("Starting up and connecting to MongoDB...")
     try:
-        await create_db_and_tables()
-        logger.info("Database tables created and ready!")
+        await connect_to_mongo()
+        logger.info("Successfully connected to MongoDB!")
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+        logger.error(f"Failed to connect to MongoDB: {e}")
         raise
 
-@app.get("/health", tags=["Health"])
-async def health_check(session: AsyncSession = Depends(get_session)):
-    try:
-        result = await session.execute(text("SELECT 1"))
-        _ = result.scalar()
-        return {"status": "ok", "db": "connected"}
-    except SQLAlchemyError as e:
-        logger.error(f"Health check DB error: {e}")
-        return {"status": "error", "db": "disconnected", "detail": str(e)}
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close database connection on shutdown"""
+    logger.info("Shutting down and closing MongoDB connection...")
+    await close_mongo_connection()
 
+# Include routers
+app.include_router(health_router)
+app.include_router(auth_router)
+
+# Root endpoint
 @app.get("/", tags=["Root"])
 async def root():
-    return {"message": "Your Document Intelligence API is running!"}
+    return {
+        "message": "Document Intelligence API is running with MongoDB!",
+        "version": "1.0.0",
+        "database": "MongoDB",
+        "docs": "/docs"
+    }
 
-@app.get("/tables", tags=["Debug"])
-async def list_tables(session: AsyncSession = Depends(get_session)):
-    """Debug endpoint to see what tables exist"""
-    try:
-        result = await session.execute(text("""
-        SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public'
-        ORDER BY table_name;
-        """))
-        tables = [row[0] for row in result.fetchall()]
-        return {"tables": tables}
-    except SQLAlchemyError as e:
-        return {"error": str(e)}

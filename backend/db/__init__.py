@@ -1,10 +1,15 @@
 # db/__init__.py
 
-from .database import get_session, engine, async_engine, create_db_and_tables
+from .database import (
+    connect_to_mongo, 
+    close_mongo_connection, 
+    get_database, 
+    check_database_health
+)
 
 __all__ = [
-    "get_session",
-    "engine",
-    "async_engine",
-    "create_db_and_tables",
+    "connect_to_mongo",
+    "close_mongo_connection", 
+    "get_database",
+    "check_database_health"
 ]

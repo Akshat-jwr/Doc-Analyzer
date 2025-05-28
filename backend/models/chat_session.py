@@ -1,23 +1,27 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from beanie import Document
+from pydantic import Field, ConfigDict
 from datetime import datetime
+from utils.pydantic_objectid import PyObjectId
+from typing import Optional
 
-class ChatSession(SQLModel, table=True):
-    __tablename__ = "chat_sessions"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    pdf_id: int = Field(foreign_key="pdfs.id", index=True)
+class ChatSession(Document):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    user_id: PyObjectId = Field(index=True)
+    pdf_id: PyObjectId = Field(index=True)
     
     # Session info
-    title: str = Field(max_length=200, default="New Chat")
-    is_active: bool = Field(default=True)
+    title: str = "New Chat"
+    is_active: bool = True
     
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    user: Optional["User"] = Relationship(back_populates="chat_sessions")
-    pdf: Optional["PDF"] = Relationship(back_populates="chat_sessions")
-    messages: List["ChatMessage"] = Relationship(back_populates="session", cascade_delete=True)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={PyObjectId: str}
+    )
+    
+    class Settings:
+        collection = "chat_sessions"

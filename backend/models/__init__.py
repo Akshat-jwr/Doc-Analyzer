@@ -1,3 +1,5 @@
+# models/__init__.py
+
 from .user import User
 from .pdf import PDF
 from .page_text import PageText
@@ -6,4 +8,12 @@ from .image import Image
 from .chat_session import ChatSession
 from .chat_message import ChatMessage
 
-__all__ = ["User", "PDF", "PageText", "Table", "Image", "ChatSession", "ChatMessage"]
+__all__ = [
+    "User", 
+    "PDF", 
+    "PageText", 
+    "Table", 
+    "Image", 
+    "ChatSession", 
+    "ChatMessage"
+]

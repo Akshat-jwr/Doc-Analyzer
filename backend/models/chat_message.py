@@ -1,17 +1,17 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from beanie import Document
+from pydantic import Field, ConfigDict
 from datetime import datetime
 from enum import Enum
+from utils.pydantic_objectid import PyObjectId
+from typing import Optional
 
 class MessageType(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
 
-class ChatMessage(SQLModel, table=True):
-    __tablename__ = "chat_messages"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="chat_sessions.id", index=True)
+class ChatMessage(Document):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    session_id: PyObjectId = Field(index=True)
     
     # Essential message data
     content: str
@@ -20,5 +20,11 @@ class ChatMessage(SQLModel, table=True):
     # Timestamp
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    session: Optional["ChatSession"] = Relationship(back_populates="messages")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={PyObjectId: str}
+    )
+    
+    class Settings:
+        collection = "chat_messages"

@@ -4,12 +4,13 @@ from datetime import datetime
 from utils.pydantic_objectid import PyObjectId
 from typing import Optional
 
-class PageText(Document):
+class OTP(Document):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
-    pdf_id: PyObjectId = Field(index=True)
-    page_number: int = Field(index=True)
-    extracted_text: str
-    
+    email: str = Field(index=True)
+    otp_code: str
+    expires_at: datetime
+    is_used: bool = False
+    purpose: str = "login"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     model_config = ConfigDict(
@@ -19,4 +20,4 @@ class PageText(Document):
     )
     
     class Settings:
-        collection = "page_texts"
+        collection = "otps"

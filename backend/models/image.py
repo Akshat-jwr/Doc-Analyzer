@@ -1,13 +1,19 @@
-from sqlmodel import SQLModel, Field, Relationship
+from beanie import Document
+from pydantic import Field, ConfigDict
+from utils.pydantic_objectid import PyObjectId
 from typing import Optional
 
-class Image(SQLModel, table=True):
-    __tablename__ = "images"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    pdf_id: int = Field(foreign_key="pdfs.id", index=True)
+class Image(Document):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    pdf_id: PyObjectId = Field(index=True)
     page_number: int = Field(index=True)
-    cloudinary_url: str = Field(max_length=1000)
+    cloudinary_url: str
     
-    # Relationships
-    pdf: Optional["PDF"] = Relationship(back_populates="images")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={PyObjectId: str}
+    )
+    
+    class Settings:
+        collection = "images"

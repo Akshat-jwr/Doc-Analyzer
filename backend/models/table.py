@@ -1,28 +1,33 @@
-from sqlmodel import SQLModel, Field, Relationship
+from beanie import Document
+from pydantic import Field, ConfigDict
 from typing import Optional
 from datetime import datetime
+from utils.pydantic_objectid import PyObjectId
 
-class Table(SQLModel, table=True):
-    __tablename__ = "tables"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    pdf_id: int = Field(foreign_key="pdfs.id", index=True)
+class Table(Document):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    pdf_id: PyObjectId = Field(index=True)
     
     # Page range for multi-page tables
     start_page: int = Field(index=True)
     end_page: int = Field(index=True)
-    table_number: int  # Table number within the document
+    table_number: int
     
     # Content (MD format only)
-    table_title: Optional[str] = Field(max_length=500)
-    markdown_content: str  # Complete table in markdown format
+    table_title: Optional[str] = None
+    markdown_content: str
     
     # Structure metadata
     column_count: int
     row_count: int
     
-    # Timestamp
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    pdf: Optional["PDF"] = Relationship(back_populates="tables")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={PyObjectId: str}
+    )
+    
+    class Settings:
+        collection = "tables"
