@@ -25,7 +25,7 @@ class CloudinaryStorageService:
     
     # Allowed document types for processing
     ALLOWED_DOCUMENT_TYPES = {
-        'pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'pages'
+        'pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'pages','csv', 'xls', 'xlsx','png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp', 'svg'
     }
     
     # Allowed image types
