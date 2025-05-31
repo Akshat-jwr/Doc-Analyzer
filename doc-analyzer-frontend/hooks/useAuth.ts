@@ -16,16 +16,8 @@ export const useAuth = () => {
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<AuthResponse> => {
-    const result = await auth.login(email, password);
-    if (result.success && result.user) {
-      setUser(result.user);
-    }
-    return result;
-  };
-
-  const register = async (email: string, password: string, fullName: string): Promise<AuthResponse> => {
-    return await auth.register(email, password, fullName);
+  const sendOTP = async (email: string): Promise<AuthResponse> => {
+    return await auth.sendOTP(email);
   };
 
   const verifyOTP = async (email: string, otp: string): Promise<AuthResponse> => {
@@ -44,8 +36,7 @@ export const useAuth = () => {
   return {
     user,
     loading,
-    login,
-    register,
+    sendOTP,
     verifyOTP,
     logout,
     isAuthenticated: !!user,

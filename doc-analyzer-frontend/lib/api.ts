@@ -5,7 +5,12 @@ import {
   DocumentStatus, 
   ChatQuery, 
   ChatResponse, 
-  UploadResponse 
+  UploadResponse,
+  Table,
+  TableSummaryResponse,
+  DocumentTablesResponse,
+  SingleTableResponse,
+  ExportTablesResponse
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -17,14 +22,22 @@ class ApiClient {
     this.baseURL = API_URL || 'http://localhost:8000';
   }
 
+  private getAuthToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('token');
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = this.getAuthToken();
+    
+    // Only add auth header for protected endpoints
+    const isProtectedEndpoint = !endpoint.includes('/auth/');
     
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(token && isProtectedEndpoint && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
       ...options,
@@ -35,6 +48,19 @@ class ApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+          // Clear invalid token and redirect to login
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            if (window.location.pathname !== '/auth') {
+              window.location.href = '/auth';
+            }
+          }
+        }
+        
         throw new Error(errorData.detail || `API Error: ${response.status} ${response.statusText}`);
       }
 
@@ -50,18 +76,11 @@ class ApiClient {
     }
   }
 
-  // Auth endpoints
-  async login(email: string, password: string): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/login', {
+  // Auth endpoints (no token required)
+  async sendOTP(email: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/send-otp', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-  }
-
-  async register(email: string, password: string, full_name: string): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, full_name }),
+      body: JSON.stringify({ email }),
     });
   }
 
@@ -72,35 +91,63 @@ class ApiClient {
     });
   }
 
-  // Document endpoints
+  // Protected endpoints (token required)
   async uploadDocument(file: File): Promise<UploadResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     
     return this.request<UploadResponse>('/documents/upload', {
       method: 'POST',
-      headers: {}, // Remove Content-Type to let browser set it for FormData
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type for FormData
+      },
       body: formData,
     });
   }
 
   async getDocuments(): Promise<Document[]> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<Document[]>('/documents/list');
   }
 
   async getDocument(id: string): Promise<DocumentDetailResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<DocumentDetailResponse>(`/documents/${id}`);
   }
 
   async getDocumentStatus(id: string): Promise<DocumentStatus> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<DocumentStatus>(`/documents/${id}/status`);
   }
 
   async deleteDocument(id: string): Promise<{ message: string }> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<{ message: string }>(`/documents/${id}`, { method: 'DELETE' });
   }
 
   async chatWithDocument(id: string, query: ChatQuery): Promise<ChatResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<ChatResponse>(`/documents/${id}/chat`, {
       method: 'POST',
       body: JSON.stringify(query),
@@ -108,7 +155,61 @@ class ApiClient {
   }
 
   async forceTableExtraction(id: string): Promise<{ message: string }> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<{ message: string }>(`/documents/${id}/force-table-extraction`, {
+      method: 'POST',
+    });
+  }
+
+  // 🔥 NEW: Table endpoints
+  async getDocumentTables(
+    documentId: string, 
+    page: number = 1, 
+    limit: number = 10, 
+    search?: string
+  ): Promise<DocumentTablesResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search && { search }),
+    });
+    
+    return this.request<DocumentTablesResponse>(`/tables/document/${documentId}?${params}`);
+  }
+
+  async getDocumentTablesSummary(documentId: string): Promise<TableSummaryResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+    return this.request<TableSummaryResponse>(`/tables/document/${documentId}/summary`);
+  }
+
+  async getSingleTable(tableId: string): Promise<SingleTableResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+    return this.request<SingleTableResponse>(`/tables/${tableId}`);
+  }
+
+  async exportDocumentTables(
+    documentId: string, 
+    format: 'markdown' | 'csv' | 'json' = 'markdown'
+  ): Promise<ExportTablesResponse> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+    return this.request<ExportTablesResponse>(`/tables/document/${documentId}/export?format=${format}`, {
       method: 'POST',
     });
   }

@@ -128,3 +128,67 @@ export interface ApiError {
   message: string;
   status: number;
 }
+// Add these new types to your existing types/index.ts:
+
+export interface TableSummary {
+  total_tables: number;
+  total_rows: number;
+  total_columns: number;
+  average_columns: number;
+  pages_with_tables: number[];
+  page_count: number;
+}
+
+export interface TablePagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface DocumentInfo {
+  id: string;
+  filename: string;
+  total_tables?: number;
+  page_count?: number;
+}
+
+export interface DocumentTablesResponse {
+  success: boolean;
+  tables: Table[];
+  pagination: TablePagination;
+  document: DocumentInfo;
+}
+
+export interface TableSummaryResponse {
+  success: boolean;
+  summary: TableSummary;
+  document: DocumentInfo;
+}
+
+export interface SingleTableResponse {
+  success: boolean;
+  table: Table;
+  document: DocumentInfo;
+}
+
+export interface ExportTablesResponse {
+  success: boolean;
+  format: string;
+  content: string | any[];
+  filename: string;
+}
+
+// Update the existing Table interface to match backend response:
+export interface Table {
+  id: string;
+  title: string;
+  table_number: number;
+  start_page: number;
+  end_page: number;
+  column_count: number;
+  row_count: number;
+  markdown_content: string;
+  created_at?: string;
+}
+

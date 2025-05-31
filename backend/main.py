@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db.database import connect_to_mongo, close_mongo_connection
-from endpoints import auth_router, health_router
+from endpoints import auth_router, health_router, tables_router
 from endpoints.pdf import router as pdf_router
 
 # Configure logging
@@ -48,6 +48,7 @@ async def shutdown_event():
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(pdf_router)
+app.include_router(tables_router)
 
 # Root endpoint
 @app.get("/", tags=["Root"])
