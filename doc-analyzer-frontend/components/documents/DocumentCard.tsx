@@ -128,9 +128,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                   {document.page_count} pages
                 </p>
                 <span className="text-blue-500/50">•</span>
-                <p className="text-blue-300/70 text-xs truncate">
+                {/* <p className="text-blue-300/70 text-xs truncate">
                   {formatDistanceToNow(new Date(document.uploaded_at))} ago
-                </p>
+                </p> */}
               </div>
             </div>
           </div>

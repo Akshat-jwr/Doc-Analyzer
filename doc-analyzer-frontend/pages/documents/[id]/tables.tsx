@@ -36,6 +36,13 @@ const DocumentTablesPage: React.FC = () => {
     error: summaryError 
   } = useDocumentTablesSummary(id as string);
 
+  console.log('Tables Page Debug:', {
+    documentId: id,
+    tablesCount: tables.length,
+    tablesWithIds: tables.filter(t => t.id).length,
+    sampleTable: tables[0]
+  });
+
   if (tablesLoading || summaryLoading) {
     return (
       <Layout title="Loading Tables...">

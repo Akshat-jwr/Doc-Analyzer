@@ -42,7 +42,6 @@ const DocumentsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
       await api.deleteDocument(id);

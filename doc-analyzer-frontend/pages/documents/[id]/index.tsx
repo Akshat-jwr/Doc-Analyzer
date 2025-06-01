@@ -97,7 +97,7 @@ const DocumentViewPage: React.FC = () => {
                 {documentData.document.filename}
               </h1>
               <p className="text-blue-300/70 text-sm">
-                Uploaded {formatDistanceToNow(new Date(documentData.document.uploaded_at))} ago
+                Uploaded {formatDistanceToNow(new Date(documentData.document.uploaded_at+19800000))} ago
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -269,7 +269,7 @@ const DocumentViewPage: React.FC = () => {
                     <span className="text-blue-300/70">Upload Date:</span>
                   </div>
                   <p className="text-white ml-6">
-                    {new Date(documentData.document.uploaded_at).toLocaleDateString('en-US', {
+                    {new Date(documentData.document.uploaded_at+19_800_000).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'

@@ -201,18 +201,30 @@ class ApiClient {
     return this.request<SingleTableResponse>(`/tables/${tableId}`);
   }
 
-  async exportDocumentTables(
-    documentId: string, 
-    format: 'markdown' | 'csv' | 'json' = 'markdown'
-  ): Promise<ExportTablesResponse> {
-    const token = this.getAuthToken();
-    if (!token) {
-      throw new Error('Authentication required. Please log in.');
-    }
-    return this.request<ExportTablesResponse>(`/tables/document/${documentId}/export?format=${format}`, {
-      method: 'POST',
-    });
+// Add this method to your existing ApiClient class:
+
+async exportSingleTable(tableId: string): Promise<Blob> {
+  const token = this.getAuthToken();
+  if (!token) {
+    throw new Error('Authentication required. Please log in.');
   }
+
+  const response = await fetch(`${this.baseURL}/tables/${tableId}/export`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Export failed: ${response.status}`);
+  }
+  
+  return await response.blob();
+}
+
+
 }
 
 export const api = new ApiClient();
