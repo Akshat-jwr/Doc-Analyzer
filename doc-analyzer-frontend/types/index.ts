@@ -77,22 +77,6 @@ export interface DocumentDetailResponse {
   images: DocumentImage[];
 }
 
-export interface ChatQuery {
-  query: string;
-  mode: 'general' | 'analytical' | 'visualization';
-  page_context?: number;
-}
-
-export interface ChatResponse {
-  mode: string;
-  response: string;
-  ready: boolean;
-  error?: string;
-  tables?: Table[];
-  source_pages?: number[];
-  chart_data?: any;
-}
-
 export enum ProcessingStatus {
   UPLOADED = 'uploaded',
   PROCESSING = 'processing',
@@ -190,5 +174,27 @@ export interface Table {
   row_count: number;
   markdown_content: string;
   created_at?: string;
+}
+
+// Add these if they don't exist:
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'bot';
+  content: string;
+  timestamp: Date;
+  mode?: string;
+}
+
+export interface ChatQuery {
+  message: string;
+  document_id?: string;
+  mode?: string;
+}
+
+export interface ChatResponse {
+  success: boolean;
+  response: string;
+  mode: string;
+  timestamp: string;
 }
 

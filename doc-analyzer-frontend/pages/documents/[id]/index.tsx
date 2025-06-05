@@ -20,6 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { formatTimeAgo,formatDateOnly } from '@/lib/dateUtils';
 
 const DocumentViewPage: React.FC = () => {
   const router = useRouter();
@@ -97,7 +98,7 @@ const DocumentViewPage: React.FC = () => {
                 {documentData.document.filename}
               </h1>
               <p className="text-blue-300/70 text-sm">
-                Uploaded {formatDistanceToNow(new Date(documentData.document.uploaded_at+19800000))} ago
+                Uploaded {formatTimeAgo(documentData.document.uploaded_at)}
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -269,11 +270,7 @@ const DocumentViewPage: React.FC = () => {
                     <span className="text-blue-300/70">Upload Date:</span>
                   </div>
                   <p className="text-white ml-6">
-                    {new Date(documentData.document.uploaded_at+19_800_000).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+                    {formatDateOnly(documentData.document.uploaded_at)}
                   </p>
                   
                   <div className="flex items-center space-x-2 mt-4">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatTimeAgo } from '@/lib/dateUtils';
 import { 
   FileText, 
   Download, 
@@ -128,9 +128,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                   {document.page_count} pages
                 </p>
                 <span className="text-blue-500/50">•</span>
-                {/* <p className="text-blue-300/70 text-xs truncate">
-                  {formatDistanceToNow(new Date(document.uploaded_at))} ago
-                </p> */}
+                <p className="text-blue-300/70 text-xs truncate">
+                  {formatTimeAgo(document.uploaded_at)}
+                </p>
               </div>
             </div>
           </div>
@@ -151,8 +151,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <p className="text-white text-lg font-bold">{document.total_tables_found}</p>
           </div>
           <div className="bg-dark-700/30 rounded-lg p-2.5 border border-blue-500/10">
-            <p className="text-blue-300/70 text-xs uppercase tracking-wide font-medium">Processed</p>
-            <p className="text-blue-300 text-lg font-bold">{document.tables_processed}</p>
+            <p className="text-blue-300/70 text-xs uppercase tracking-wide font-medium">Pages</p>
+            <p className="text-blue-300 text-lg font-bold">{document.page_count}</p>
           </div>
         </div>
 

@@ -8,7 +8,8 @@ import {
   Settings, 
   LogOut, 
   X,
-  Brain
+  Brain,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
@@ -25,7 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const menuItems = [
     { icon: Home, label: 'Dashboard', href: '/' },
     { icon: FileText, label: 'Documents', href: '/documents' },
-    { icon: Upload, label: 'Upload', href: '/upload' },
+    { icon: MessageSquare, label: 'AI Chat', href: '/chat' },
   ];
 
   const handleNavigation = (href: string) => {
