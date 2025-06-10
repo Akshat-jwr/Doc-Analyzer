@@ -1165,11 +1165,29 @@ Provide comprehensive answer using all available content:"""
                     )
                     await assistant_message.insert()
             else:
-                # Standalone chat
+                # ✅ FIXED: Standalone chat with memory
                 recent_messages = await history_task
+                recent_messages.reverse()
+    
+             # ✅ BUILD PROMPT WITH HISTORY
+                if len(recent_messages) > 1:
+                    conversation_history = "\nRECENT CONVERSATION:\n"
+                    for msg in recent_messages[-6:-1]:  # Last 5 messages
+                        conversation_history += f"{msg.role.upper()}: {msg.content}\n"
+        
+                    prompt = f"""You are a helpful AI assistant with conversation memory.
+
+            {conversation_history}
+
+            CURRENT MESSAGE: {message}
+
+            Remember previous conversations and provide a helpful response:"""
+                else:
+                    prompt = f"User: {message}\n\nProvide helpful response:"
+
                 
                 try:
-                    response = self.llm_text.generate_content(f"User: {message}\n\nProvide helpful response:")
+                    response = self.llm_text.generate_content(f"User: {prompt}\n\nProvide helpful response:")
                     response_text = response.text
                 except Exception as e:
                     response_text = "Error occurred. Please try again."
@@ -1208,7 +1226,7 @@ Provide comprehensive answer using all available content:"""
     
     # 🎯 ENHANCED ANALYTICAL CHAT HANDLER (MAIN FEATURE)
     async def _handle_enhanced_analytical_chat(self, session: ChatSession, message: str, user_id: str) -> Dict[str, Any]:
-        """🎯 ENHANCED: Sexy analytical chat with page-specific analysis and table modifications"""
+        """🎯 ENHANCED: Analytical chat with optimized conversation memory"""
         try:
             # Save user message
             user_message = ChatMessage(
@@ -1220,6 +1238,9 @@ Provide comprehensive answer using all available content:"""
                 content=message
             )
             await user_message.insert()
+            
+            # 🧠 GET OPTIMIZED CHAT HISTORY FOR ANALYTICAL CHAT
+            chat_history = await self._get_optimized_analytical_history(session.session_id, max_messages=10, max_tokens=1500)
             
             if not session.document_id:
                 response_text = "🚫 Analytical chat requires a document with tables. Please upload a document containing structured data."
@@ -1244,32 +1265,27 @@ Provide comprehensive answer using all available content:"""
                     }
                 }
             
-            # 🎯 EXTRACT PAGE NUMBER
+            # Extract page number
             page_number, clean_query = self._extract_page_number_from_query(message)
             
+            # ... existing table retrieval logic ...
             tables_data = []
             analysis_method = "unknown"
             
             if page_number:
-                # 📊 PAGE-SPECIFIC ANALYSIS
                 logger.info(f"📊 PAGE-SPECIFIC analysis for page {page_number}")
                 analysis_method = "page_specific"
-                
-                # Get tables for specific page
                 page_tables = await self._get_page_tables(str(session.document_id), page_number)
                 
                 if page_tables:
-                    # Tables found in DB
                     tables_data = page_tables
                     logger.info(f"✅ Using {len(page_tables)} tables from database for page {page_number}")
                 else:
-                    # No tables in DB - use image fallback
-                    logger.info(f"🖼️ No tables in DB for page {page_number} - using image analysis")
-                    image_analysis = await self._analyze_page_image_for_tables(
-                        str(session.document_id), page_number, clean_query
+                    # Image fallback with history context
+                    image_analysis = await self._analyze_page_image_for_tables_with_history(
+                        str(session.document_id), page_number, clean_query, chat_history
                     )
                     
-                    # Return image analysis directly
                     assistant_message = ChatMessage(
                         session_id=session.session_id,
                         user_id=PyObjectId(user_id),
@@ -1280,12 +1296,12 @@ Provide comprehensive answer using all available content:"""
                         metadata={
                             "analysis_method": "image_fallback",
                             "page_number": page_number,
-                            "tables_in_db": False
+                            "tables_in_db": False,
+                            "has_history_context": bool(chat_history)
                         }
                     )
                     await assistant_message.insert()
                     
-                    # Update session
                     session.updated_at = datetime.now()
                     session.last_activity = datetime.now()
                     session.message_count += 2
@@ -1299,16 +1315,15 @@ Provide comprehensive answer using all available content:"""
                             "chat_type": "analytical",
                             "analysis_method": "image_fallback",
                             "page_number": page_number,
-                            "tables_in_db": False
+                            "tables_in_db": False,
+                            "has_history_context": bool(chat_history)
                         }
                     }
             else:
-                # 📊 ALL TABLES ANALYSIS
                 logger.info(f"📊 ANALYZING ALL TABLES in document")
                 analysis_method = "all_tables"
                 
                 all_tables = await Table.find(Table.pdf_id == PyObjectId(session.document_id)).to_list()
-                
                 for table in all_tables:
                     tables_data.append({
                         'id': str(table.id),
@@ -1321,7 +1336,7 @@ Provide comprehensive answer using all available content:"""
                     })
             
             if not tables_data:
-                response_text = f"📊 No tables found {'for page ' + str(page_number) if page_number else 'in document'}. The background table extraction may still be processing, or the {'page' if page_number else 'document'} may not contain any tables."
+                response_text = f"📊 No tables found {'for page ' + str(page_number) if page_number else 'in document'}. The background table extraction may still be processing."
                 
                 assistant_message = ChatMessage(
                     session_id=session.session_id,
@@ -1334,30 +1349,24 @@ Provide comprehensive answer using all available content:"""
                 await assistant_message.insert()
                 
                 return {
-                "success": True,
-                "response": response_text,
-                "metadata": {
-                    "session_id": session.session_id,
-                    "chat_type": "analytical",
-                    "analysis_method": analysis_method,
-                    "page_number": page_number,
-                    "tables_found": len(tables_data),
-                    "is_modification": modification_result.get("is_modification", False),
-        
-                    # ✅ FRONTEND INTEGRATION FIELDS
-                    "show_download_button": modification_result.get("download_ready", False),
-                    "download_id": modification_result.get("download_id"),
-                    "modified_table_markdown": modification_result.get("modified_table_markdown"),
-                    "response_type": "table_modification" if modification_result.get("is_modification") else "analysis"
+                    "success": True,
+                    "response": response_text,
+                    "metadata": {
+                        "session_id": session.session_id,
+                        "chat_type": "analytical",
+                        "analysis_method": analysis_method,
+                        "page_number": page_number,
+                        "tables_found": 0,
+                        "has_history_context": bool(chat_history)
+                    }
                 }
-            }
             
-            # 🔄 CHECK FOR TABLE MODIFICATIONS
+            # Check for table modifications
             modification_result = await self._handle_table_modification(tables_data, clean_query, page_number)
             
             if modification_result["is_modification"]:
                 # User wants to modify tables
-                response_text = modification_result["analysis"]
+                response_text = modification_result["analysis_text"]
                 
                 metadata = {
                     "session_id": session.session_id,
@@ -1366,16 +1375,19 @@ Provide comprehensive answer using all available content:"""
                     "page_number": page_number,
                     "tables_found": len(tables_data),
                     "is_modification": True,
-                    "download_ready": modification_result["download_ready"]
+                    "download_ready": modification_result["download_ready"],
+                    "has_history_context": bool(chat_history)
                 }
                 
                 if modification_result["download_ready"]:
                     metadata["download_id"] = modification_result["download_id"]
-                    metadata["new_table_markdown"] = modification_result["new_table_markdown"]
+                    metadata["modified_table_markdown"] = modification_result["modified_table_markdown"]
                 
             else:
-                # Regular analytical analysis
-                response_text = await self._generate_analytical_response(tables_data, clean_query, page_number, analysis_method)
+                # 🧠 ENHANCED: Generate analytical response WITH HISTORY
+                response_text = await self._generate_analytical_response_with_history(
+                    tables_data, clean_query, page_number, analysis_method, chat_history
+                )
                 
                 metadata = {
                     "session_id": session.session_id,
@@ -1383,7 +1395,8 @@ Provide comprehensive answer using all available content:"""
                     "analysis_method": analysis_method,
                     "page_number": page_number,
                     "tables_found": len(tables_data),
-                    "is_modification": False
+                    "is_modification": False,
+                    "has_history_context": bool(chat_history)
                 }
             
             # Save assistant response
@@ -1412,17 +1425,17 @@ Provide comprehensive answer using all available content:"""
             
         except Exception as e:
             logger.error(f"Error in enhanced analytical chat: {e}")
-            logger.error(f"Full traceback: {traceback.format_exc()}")
             return {
                 "success": False,
                 "error": str(e),
-                "response": "I encountered an error processing your analytical request. Please try again."
+                "response": "I encountered an error processing your analytical request."
             }
+
     
     # ✅ VISUALIZATION CHAT
 # 📈 ENHANCED VISUALIZATION WITH SERVER-SIDE EXECUTION
     async def _handle_enhanced_visualization_chat(self, session: ChatSession, message: str, user_id: str) -> Dict[str, Any]:
-        """📈 ENHANCED: Visualization chat with server-side Python execution and image generation"""
+        """📈 ENHANCED: Visualization chat with user-prompt-only conversation memory"""
         try:
             user_message = ChatMessage(
                 session_id=session.session_id,
@@ -1433,6 +1446,9 @@ Provide comprehensive answer using all available content:"""
                 content=message
             )
             await user_message.insert()
+            
+            # 🧠 GET USER-PROMPTS-ONLY HISTORY FOR VISUALIZATION
+            chat_history = await self._get_user_prompts_history(session.session_id, max_messages=8)
             
             if not session.document_id:
                 response_text = "📈 Visualization chat requires a document with tables. Please upload a document containing structured data."
@@ -1455,10 +1471,10 @@ Provide comprehensive answer using all available content:"""
                     }
                 }
             
-            # Extract page number (if specified)
+            # Extract page number
             page_number, clean_query = self._extract_page_number_from_query(message)
             
-            # Get tables data
+            # ... existing table retrieval logic ...
             tables_data = []
             if page_number:
                 logger.info(f"📊 Getting tables for page {page_number}")
@@ -1500,8 +1516,10 @@ Provide comprehensive answer using all available content:"""
                     }
                 }
             
-            # Generate and execute visualization
-            execution_result = await self._generate_and_execute_visualization(tables_data, clean_query, page_number)
+            # 🧠 ENHANCED: Generate and execute visualization WITH HISTORY CONTEXT
+            execution_result = await self._generate_and_execute_visualization_with_history(
+                tables_data, clean_query, page_number, chat_history
+            )
             
             if execution_result["success"]:
                 response_text = execution_result["response"]
@@ -1523,7 +1541,8 @@ Provide comprehensive answer using all available content:"""
                         "python_code": execution_result.get("python_code"),
                         "execution_successful": True,
                         "response_type": "visualization",
-                        "has_image": True
+                        "has_image": True,
+                        "has_history_context": bool(chat_history)
                     }
                 )
             else:
@@ -1543,7 +1562,8 @@ Provide comprehensive answer using all available content:"""
                         "page_number": page_number,
                         "has_visualization": False,
                         "execution_successful": False,
-                        "error": execution_result.get("error")
+                        "error": execution_result.get("error"),
+                        "has_history_context": bool(chat_history)
                     }
                 )
             
@@ -1566,7 +1586,8 @@ Provide comprehensive answer using all available content:"""
                     "image_base64": execution_result.get("image_base64") if execution_result.get("success") else None,
                     "execution_successful": execution_result.get("success", False),
                     "tables_found": len(tables_data),
-                    "page_number": page_number
+                    "page_number": page_number,
+                    "has_history_context": bool(chat_history)
                 }
             }
             
@@ -1577,6 +1598,7 @@ Provide comprehensive answer using all available content:"""
                 "error": str(e),
                 "response": "I encountered an error generating the visualization."
             }
+
 
         
     def _clean_generated_code(self, code: str) -> str:
