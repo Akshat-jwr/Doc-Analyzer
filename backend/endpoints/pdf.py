@@ -460,6 +460,10 @@ async def delete_document(  # 🔥 UPDATED: Changed function name
         if document.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied")
         
+        from services.multi_chat_service import multi_chat_service
+        chunk_deletion_result = await multi_chat_service.delete_document_chunks(document_id)
+        
+        
         # Delete from Cloudinary
         try:
             public_id = document.cloudinary_url.split('/')[-1].split('.')[0]

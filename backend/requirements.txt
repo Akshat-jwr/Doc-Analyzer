@@ -59,3 +59,38 @@ xlrd>=2.0.0            # For older Excel files (.xls)
 tabulate>=0.9.0        # For markdown table formatting
 openpyxl==3.1.2
 pandas==2.1.4
+
+# STABLE WORKING COMBINATION (2025 tested)
+# Core LangChain - MUST stay on 0.2.x family
+langchain-core==0.2.43
+langchain==0.2.16
+langchain-community==0.2.16
+langchain-text-splitters==0.2.4
+langsmith==0.1.147
+
+# Google GenAI - Latest compatible
+google-generativeai==0.8.3
+langchain-google-genai==2.0.4
+
+# HuggingFace ecosystem - Stable versions
+huggingface-hub==0.26.2
+transformers==4.45.0
+sentence-transformers==3.2.1
+tokenizers==0.20.4
+
+# Vector store
+chromadb==0.5.20
+
+# Pydantic - Stable v2
+pydantic==2.9.2
+pydantic-core==2.27.1
+
+# PyTorch - Stable CPU versions
+torch==2.1.0
+torchvision==0.16.0
+torchaudio==2.1.0
+
+# Utilities
+tiktoken==0.8.0
+numpy==1.24.3
+

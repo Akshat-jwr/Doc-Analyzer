@@ -13,6 +13,9 @@ import shutil
 import asyncio
 import pandas as pd
 import requests
+from sentence_transformers import SentenceTransformer
+from models.document_chunk import DocumentChunk
+
 
 # Import our MongoDB models and services
 from models.user import User
@@ -41,6 +44,9 @@ class StreamlinedPDFProcessor:
         # Set up logger
         self.logger = self._setup_logger()
         self.pdf_record: Optional[PDF] = None
+
+
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
     def _setup_logger(self) -> logging.Logger:
         """Set up optimized logger configuration"""
@@ -894,69 +900,113 @@ class StreamlinedPDFProcessor:
             return ""
 
     async def _store_text_and_images_only(self, page_results: List[Dict], skip_image_extraction: bool = False):
-        """Store TEXT AND IMAGES ONLY with better error handling"""
-        
-        # Prepare page texts and image tasks
-        page_texts = []
+        """✅ UPDATED: Store page-wise text chunks in DocumentChunk + images (NO PageText)"""
+    
+        # Prepare text chunks and image tasks
+        text_chunks = []
         image_tasks = []
-        
+    
+        self.logger.info("🔥 Phase 1: Processing page-wise text chunks + image storage (NO PageText)")
+    
         for page_data in page_results:
-            # Prepare page text
-            page_text = PageText(
-                pdf_id=self.pdf_record.id,
-                page_number=page_data["page"],
-                extracted_text=page_data["page_content"]
-            )
-            page_texts.append(page_text)
-            
-            # Conditional image processing
+            page_content = page_data.get("page_content", "")
+        
+            # ✅ NEW: Store entire page text as single chunk in DocumentChunk
+            if page_content and page_content.strip():
+                try:
+                    chunk_text = page_content.strip()
+                    embedding = self.embedding_model.encode(chunk_text).tolist()
+
+                    chunk_doc = DocumentChunk(
+                        document_id=str(self.pdf_record.id),
+                        page_number=page_data["page"],
+                        chunk_index=0,  # Always 0 for page-wise chunks
+                        content_type='text',
+                        content=chunk_text,
+                        embedding=embedding,
+                        metadata={
+                            'filename': self.pdf_record.filename,
+                            'source': 'page_text_full',
+                            'word_count': len(chunk_text.split()),
+                            'char_count': len(chunk_text),
+                            'phase': 'phase_1_page_wise',
+                            'chunking_strategy': 'page_wise'
+                        }
+                    )
+                    text_chunks.append(chunk_doc)
+
+                    self.logger.info(f"📝 Page {page_data['page']}: Stored as single chunk ({len(chunk_text)} chars)")
+
+                except Exception as e:
+                    self.logger.error(f"❌ Error storing page {page_data['page']} as chunk: {e}")
+
+            # ✅ UNCHANGED: Image processing remains exactly the same
             if not skip_image_extraction:
-                # Prepare image upload tasks
                 for img_data in page_data.get("embedded_images", []):
                     img_path = os.path.join(
                         self.temp_folder, 
                         "embedded_images", 
                         f"page{page_data['page']}image{img_data['index']}.{img_data['extension']}"
                     )
-                    
+
                     if os.path.exists(img_path):
                         task = self._upload_single_image_optimized(img_path, page_data['page'], img_data['index'])
                         image_tasks.append(task)
-        
-        # Execute in parallel with error handling
+
+        # ✅ UPDATED: Execute storage tasks (NO PageText storage)
         try:
             if skip_image_extraction:
-                # Large PDFs: Only store text
-                self.logger.info(f"⚠️ Large PDF - storing TEXT ONLY (no images)")
-                await self._store_page_texts_batch(page_texts)
-                self.logger.info("✅ Text stored successfully (images skipped for large PDF)")
+                # Large PDFs: Store text chunks only
+                self.logger.info(f"⚠️ Large PDF - storing PAGE-WISE TEXT CHUNKS ONLY (no images)")
+                await self._store_text_chunks_batch(text_chunks)
+                self.logger.info(f"✅ {len(text_chunks)} page-wise text chunks stored successfully (images skipped)")
             else:
-                # Normal PDFs: Store text and images
+                # Normal PDFs: Store text chunks + images
                 storage_tasks = [
-                    self._store_page_texts_batch(page_texts),
+                    self._store_text_chunks_batch(text_chunks),
                     self._store_images_batch(image_tasks)
                 ]
-                
                 await asyncio.gather(*storage_tasks, return_exceptions=True)
-                self.logger.info("✅ Text and images stored successfully")
-        except Exception as e:
-            self.logger.error(f"Error in data storage: {e}")
+                self.logger.info(f"✅ {len(text_chunks)} page-wise text chunks + images stored successfully")
 
-    async def _store_page_texts_batch(self, page_texts: List[PageText]):
-        """Store page texts in batch"""
-        if not page_texts:
-            return
-        
-        try:
-            await PageText.insert_many(page_texts)
-            self.logger.info(f"✅ Batch inserted {len(page_texts)} page texts")
-        except AttributeError:
-            # Fallback to individual inserts
-            insert_tasks = [text.insert() for text in page_texts]
-            await asyncio.gather(*insert_tasks, return_exceptions=True)
-            self.logger.info(f"✅ Individually inserted {len(page_texts)} page texts")
         except Exception as e:
-            self.logger.error(f"Error storing page texts: {e}")
+            self.logger.error(f"Error in page-wise data storage: {e}")
+
+
+    async def _store_text_chunks_batch(self, text_chunks: List[DocumentChunk]):
+        """✅ NEW: Store page-wise text chunks in batch"""
+        if not text_chunks:
+            self.logger.info("No page-wise text chunks to store")
+            return
+    
+        try:
+            await DocumentChunk.insert_many(text_chunks)
+            self.logger.info(f"✅ Phase 1: Batch inserted {len(text_chunks)} page-wise text chunks")
+        except AttributeError:
+        # Fallback to individual inserts
+            insert_tasks = [chunk.insert() for chunk in text_chunks]
+            await asyncio.gather(*insert_tasks, return_exceptions=True)
+            self.logger.info(f"✅ Phase 1: Individually inserted {len(text_chunks)} page-wise text chunks")
+        except Exception as e:
+            self.logger.error(f"Error storing page-wise text chunks: {e}")
+
+
+
+    # async def _store_page_texts_batch(self, page_texts: List[PageText]):
+    #     """Store page texts in batch"""
+    #     if not page_texts:
+    #         return
+        
+    #     try:
+    #         await PageText.insert_many(page_texts)
+    #         self.logger.info(f"✅ Batch inserted {len(page_texts)} page texts")
+    #     except AttributeError:
+    #         # Fallback to individual inserts
+    #         insert_tasks = [text.insert() for text in page_texts]
+    #         await asyncio.gather(*insert_tasks, return_exceptions=True)
+    #         self.logger.info(f"✅ Individually inserted {len(page_texts)} page texts")
+    #     except Exception as e:
+    #         self.logger.error(f"Error storing page texts: {e}")
 
     async def _store_images_batch(self, image_tasks: List):
         """Store images with controlled concurrency"""

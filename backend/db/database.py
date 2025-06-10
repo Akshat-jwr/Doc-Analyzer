@@ -30,15 +30,16 @@ async def connect_to_mongo():
         from models.table import Table
         from models.image import Image
         from models.chat_session import ChatSession
-        from models.chat_message import ChatMessage
+        from models.chat_session import ChatMessage
         from auth.models import OTP
+        from models.document_chunk import DocumentChunk
         
         # Initialize Beanie
         await init_beanie(
             database=db.database,
             document_models=[
                 User, PDF, PageText, Table, Image, 
-                ChatSession, ChatMessage, OTP
+                ChatSession, ChatMessage, OTP, DocumentChunk
             ]
         )
         

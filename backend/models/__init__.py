@@ -7,6 +7,7 @@ from .table import Table
 from .image import Image
 from .chat_session import ChatSession
 from .chat_message import ChatMessage
+from .document_chunk import DocumentChunk
 
 __all__ = [
     "User", 
@@ -15,5 +16,6 @@ __all__ = [
     "Table", 
     "Image", 
     "ChatSession", 
-    "ChatMessage"
+    "ChatMessage",
+    "DocumentChunk"
 ]
