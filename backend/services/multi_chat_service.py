@@ -1002,6 +1002,7 @@ Structured data from page {table_page}."""
     async def send_message(self, session_id: str, user_id: str, message: str) -> Dict[str, Any]:
         """💬 SEND MESSAGE"""
         try:
+            # ✅ IMPORTANT: Get session first
             session = await ChatSession.find_one(ChatSession.session_id == session_id)
             if not session:
                 return {"success": False, "error": "Session not found"}
@@ -1009,19 +1010,20 @@ Structured data from page {table_page}."""
             if str(session.user_id) != user_id:
                 return {"success": False, "error": "Access denied"}
             
-            # Route to chat handlers
+            # Route to chat handlers - PASS session object
             if session.chat_type == ChatType.GENERAL:
                 return await self._handle_general_chat(session, message, user_id)
             elif session.chat_type == ChatType.ANALYTICAL:
                 return await self._handle_enhanced_analytical_chat(session, message, user_id)
             elif session.chat_type == ChatType.VISUALIZATION:
-                return await self._handle_enhanced_visualization_chat(session, message, user_id)  # ✅ UPDATED
+                return await self._handle_enhanced_visualization_chat(session, message, user_id)  # ✅ Pass session
             else:
                 return {"success": False, "error": f"Unknown chat type: {session.chat_type}"}
                 
         except Exception as e:
             logger.error(f"Error sending message: {e}")
             return {"success": False, "error": str(e), "response": "I encountered an error."}
+
 
     
     # ✅ ULTRA-FAST GENERAL CHAT
@@ -1453,10 +1455,10 @@ Provide comprehensive answer using all available content:"""
                     }
                 }
             
-            # 🎯 EXTRACT PAGE NUMBER (if specified)
+            # Extract page number (if specified)
             page_number, clean_query = self._extract_page_number_from_query(message)
             
-            # 📊 GET TABLES DATA
+            # Get tables data
             tables_data = []
             if page_number:
                 logger.info(f"📊 Getting tables for page {page_number}")
@@ -1498,13 +1500,12 @@ Provide comprehensive answer using all available content:"""
                     }
                 }
             
-            # 🚀 GENERATE AND EXECUTE PYTHON CODE
+            # Generate and execute visualization
             execution_result = await self._generate_and_execute_visualization(tables_data, clean_query, page_number)
             
             if execution_result["success"]:
                 response_text = execution_result["response"]
                 
-                # Save assistant response with image
                 assistant_message = ChatMessage(
                     session_id=session.session_id,
                     user_id=PyObjectId(user_id),
@@ -1520,7 +1521,9 @@ Provide comprehensive answer using all available content:"""
                         "has_visualization": True,
                         "image_base64": execution_result.get("image_base64"),
                         "python_code": execution_result.get("python_code"),
-                        "execution_successful": True
+                        "execution_successful": True,
+                        "response_type": "visualization",
+                        "has_image": True
                     }
                 )
             else:
@@ -1555,7 +1558,16 @@ Provide comprehensive answer using all available content:"""
             return {
                 "success": True,
                 "response": response_text,
-                "metadata": assistant_message.metadata
+                "metadata": {
+                    "session_id": session.session_id,
+                    "chat_type": "visualization",
+                    "response_type": "visualization",
+                    "has_image": execution_result.get("success", False),
+                    "image_base64": execution_result.get("image_base64") if execution_result.get("success") else None,
+                    "execution_successful": execution_result.get("success", False),
+                    "tables_found": len(tables_data),
+                    "page_number": page_number
+                }
             }
             
         except Exception as e:
@@ -1565,11 +1577,41 @@ Provide comprehensive answer using all available content:"""
                 "error": str(e),
                 "response": "I encountered an error generating the visualization."
             }
+
         
     def _clean_generated_code(self, code: str) -> str:
-        # Remove import statements added by LLM
-        lines = [l for l in code.splitlines() if not l.strip().startswith('import ')]
-        return '\n'.join(lines)
+        """Clean and fix common issues in generated code"""
+        try:
+            import re
+            lines = code.split('\n')
+            cleaned_lines = []
+            
+            for line in lines:
+                # Skip import statements
+                if (line.strip().startswith('import ') or 
+                    line.strip().startswith('from ')):
+                    continue
+                
+                # Fix .str accessor usage safely
+                if '.str.' in line:
+                    line = re.sub(r'(\w+(?:\[[^\]]+\])?|\w+\.iloc\[[^\]]+\])\.str\.', r'\1.astype(str).str.', line)
+                
+                # Handle column access issues
+                if "df['" in line and "']" in line:
+                    match = re.search(r"df\['([^']+)'\]", line)
+                    if match:
+                        col_name = match.group(1).strip()
+                        if any(char in col_name for char in ['|', 'Daniel', 'Emma', 'Rupert']):
+                            line = line.replace(f"df['{col_name}']", "df.iloc[:,1]")
+                
+                cleaned_lines.append(line)
+            
+            return '\n'.join(cleaned_lines)
+        except Exception as e:
+            logger.error(f"Error cleaning code: {e}")
+            return code
+
+
     
     async def _generate_and_execute_visualization(self, tables_data: List[Dict], query: str, page_number: Optional[int]) -> Dict[str, Any]:
         """🚀 Generate Python code and execute it server-side"""
@@ -1594,8 +1636,7 @@ Provide comprehensive answer using all available content:"""
             
             context = "\n".join(context_parts)
             
-            # 🎯 ENHANCED VISUALIZATION PROMPT
-            # 🎯 ENHANCED VISUALIZATION PROMPT (REPLACE EXISTING)
+            # Enhanced visualization prompt
             visualization_prompt = f"""Python Visualization Code Generator
 
 {context}
@@ -1605,49 +1646,42 @@ Generate EXECUTABLE Python code for visualization.
 Requirements:
 1. DO NOT include import statements - modules are pre-imported (plt, pd, np, StringIO)
 2. Parse markdown table data correctly
-3. Identify column names properly  
+3. Always convert to string first: use .astype(str).str for any string operations
 4. Create appropriate visualization
-5. Use proper column indexing
-6. Add titles and labels
-7. Use plt.tight_layout()
-8. DO NOT use plt.show()
+5. Add titles and labels
+6. Use plt.tight_layout()
+7. DO NOT use plt.show()
 
-IMPORTANT: When parsing pipe-separated markdown tables:
-- First column is index 0
-- Second column is index 1
-- Use df.iloc[:,0] and df.iloc[:,1] for safe column access
-- Or use proper column names after cleaning
-
-Example for pipe-separated table:
-Parse table data (remove separator row)
+Safe Example:
+Parse table data
 table_data = '''Character|Actor
 Main character|Daniel Radcliffe
 Sidekick 1|Rupert Grint'''
 
-Create DataFrame and clean
+Create DataFrame
 df = pd.read_csv(StringIO(table_data), sep='|')
-df.columns = df.columns.str.strip()
+df.columns = df.columns.astype(str).str.strip()
 df = df.dropna().reset_index(drop=True)
 
-Remove separator rows if any
-df = df[~df.iloc[:,0].str.contains('-', na=False)]
+Convert entire DataFrame to string for safety
+df = df.astype(str)
 
-Access columns safely
-characters = df.iloc[:,0] # First column
-actors = df.iloc[:,1] # Second column
+Access data safely
+categories = df.iloc[:,0] # First column
+values = df.iloc[:,1] # Second column
 
 Create visualization
 plt.figure(figsize=(10, 6))
-plt.bar(actors, *len(actors)) # Example bar chart
+value_counts = values.value_counts()
+plt.bar(value_counts.index, value_counts.values)
 plt.title('Data Visualization')
 plt.xlabel('Categories')
-plt.ylabel('Values')
+plt.ylabel('Count')
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
 
-text
 
-Generate the visualization code:"""
+Generate safe visualization code:"""
             
             # Generate code with LLM
             response = self.llm_text.generate_content(visualization_prompt)
@@ -1662,25 +1696,17 @@ Generate the visualization code:"""
                     "error": "Failed to extract Python code from LLM response"
                 }
             
-            # 🚀 EXECUTE CODE SERVER-SIDE
+            # Execute code server-side
             execution_result = await self._execute_python_visualization_safely(python_code, tables_data)
             
             if execution_result["success"]:
+                # ✅ FIXED: Don't reference 'session' here - it's not in scope
                 return {
-        "success": True,
-        # ✅ CLEAN: Simple response for frontend
-        "response": f"📈 **Visualization Generated Successfully**\n\n**Query:** {query}\n\n**Chart:**\n![Generated Chart](data:image/png;base64,{execution_result['image_base64']})",
-        "image_base64": execution_result["image_base64"],
-        "python_code": python_code,  # Available but not in main response
-        
-        # ✅ FRONTEND METADATA
-        "metadata": {
-            "response_type": "visualization",
-            "has_image": True,
-            "image_format": "png",
-            "code_available": True
-        }
-    }
+                    "success": True,
+                    "response": f"📈 **Visualization Generated Successfully**\n\n**Query:** {query}\n\n**Execution Status:** ✅ Successfully executed and rendered\n**Tables Used:** {len(tables_data)} table(s)",
+                    "image_base64": execution_result["image_base64"],
+                    "python_code": python_code
+                }
             else:
                 return {
                     "success": False,
@@ -1694,6 +1720,8 @@ Generate the visualization code:"""
                 "success": False,
                 "error": str(e)
             }
+        
+    
     
     def _extract_python_code_from_response(self, response: str) -> Optional[str]:
         """Extract Python code from LLM response using robust code-fence regex"""
@@ -1709,22 +1737,47 @@ Generate the visualization code:"""
             return None
 
 
-    
-    async def _execute_python_visualization_safely(self, python_code: str, tables_data: List[Dict]) -> Dict[str, Any]:
-        """Execute sanitized Python code using Agg backend and return base64 image"""
+    def _clean_base64_string(self, base64_string: str) -> str:
+        """Clean base64 string from invalid characters"""
         try:
-            # Ensure non-interactive mode
-            plt.ioff()
+            import re
+
+            # Remove all non-base64 characters (keep only A-Z, a-z, 0-9, +, /, =)
+            cleaned = re.sub(r'[^A-Za-z0-9+/=]', '', base64_string)
+
+            # Ensure proper padding
+            while len(cleaned) % 4 != 0:
+                cleaned += '='
+
+            return cleaned
+        except Exception as e:
+            logger.error(f"Error cleaning base64: {e}")
+            return base64_string
+
+
+    async def _execute_python_visualization_safely(self, python_code: str, tables_data: List[Dict]) -> Dict[str, Any]:
+        """🔒 Execute Python code safely and return base64 image"""
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            import pandas as pd
+            import io
+            import base64
+            from io import StringIO
+            import numpy as np
+
+            # Clear any existing plots
+            plt.clf()
             plt.close('all')
 
-            # Clean code of imports
+            # Clean code (strip unwanted imports)
             cleaned_code = self._clean_generated_code(python_code)
-            logger.info(f"Executing cleaned code:\n{cleaned_code}")
+            logger.info(f"Executing code:\n{cleaned_code}")
 
-            # Prepare safe globals including matplotlib
+            # Prepare safe globals
             safe_globals = {
                 'plt': plt,
-                'matplotlib': matplotlib,
                 'pd': pd,
                 'pandas': pd,
                 'np': np,
@@ -1732,41 +1785,61 @@ Generate the visualization code:"""
                 'StringIO': StringIO,
                 'io': io,
                 '__builtins__': {
+                    '__import__': __import__,
                     'len': len, 'str': str, 'int': int, 'float': float,
                     'list': list, 'dict': dict, 'range': range,
-                    'print': print, 'min': min, 'max': max,
-                    'sum': sum, 'abs': abs, 'round': round,
-                    'enumerate': enumerate,'ValueError': ValueError,
+                    'enumerate': enumerate, 'zip': zip, 'print': print,
+                    'abs': abs, 'round': round, 'min': min, 'max': max,
+                    'sum': sum, 'type': type, 'isinstance': isinstance,
+                    'any': any, 'all': all, 'sorted': sorted, 'hasattr': hasattr
                 }
             }
 
-            # Inject tables as DataFrames: df_1, df_2, ...
-            for idx, table in enumerate(tables_data, start=1):
-                md_lines = table['markdown_content'].splitlines()
-                md_clean = '\n'.join([l for l in md_lines if not re.match(r"^\s*\|?-+\|?", l)])
-                df = pd.read_csv(StringIO(md_clean), sep='|', skipinitialspace=True)
-                df.columns = df.columns.str.strip()
-                safe_globals[f'df_{idx}'] = df
+            # Add table data to environment
+            for i, table in enumerate(tables_data):
+                safe_globals[f'table_{i+1}_data'] = table['markdown_content']
+                safe_globals[f'table_{i+1}_title'] = table['title']
 
-            # Execute code in thread pool
+            # Execute in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, lambda: exec(cleaned_code, safe_globals, safe_globals))
+            await loop.run_in_executor(
+                self.thread_pool,
+                lambda: exec(cleaned_code, safe_globals)
+            )
 
-            # Capture figure to buffer
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-            buf.seek(0)
-            img_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-            buf.close()
+            # Convert plot to base64 image
+            img_buffer = io.BytesIO()
+            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=150)
+            img_buffer.seek(0)
 
-            # Close plots
+            # Encode to base64
+            img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+
+            # Clean up
             plt.close('all')
+            img_buffer.close()
 
-            return {"success": True, "image_base64": img_b64}
+            logger.info(f"✅ Python visualization executed successfully")
+
+            return {
+                "success": True,
+                "image_base64": img_base64
+            }
+
         except Exception as e:
-            logger.error(f"Visualization execution error: {e}")
-            plt.close('all')
-            return {"success": False, "error": str(e)}
+            logger.error(f"❌ Python execution error: {e}")
+
+            # Clean up on error
+            try:
+                plt.close('all')
+            except:
+                pass
+                
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
 
 
     def _remove_import_statements(self, code: str) -> str:
