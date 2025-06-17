@@ -6,6 +6,7 @@ from db.database import connect_to_mongo, close_mongo_connection
 from endpoints import auth_router, health_router, tables_router
 from endpoints.pdf import router as pdf_router
 from endpoints.multi_chat import router as multi_chat_router  # ✅ ADD THIS
+from endpoints.llm_visualization import router as visualization_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,6 +57,7 @@ app.include_router(auth_router)
 app.include_router(pdf_router)
 app.include_router(tables_router)
 app.include_router(multi_chat_router)  # ✅ ADD THIS
+app.include_router(visualization_router)  # ✅ ADD THIS
 
 # Root endpoint
 @app.get("/", tags=["Root"])

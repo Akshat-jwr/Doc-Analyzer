@@ -8,6 +8,7 @@ from .image import Image
 from .chat_session import ChatSession
 from .chat_message import ChatMessage
 from .document_chunk import DocumentChunk
+from .llm_visualization import LLMVisualization
 
 __all__ = [
     "User", 
@@ -17,5 +18,6 @@ __all__ = [
     "Image", 
     "ChatSession", 
     "ChatMessage",
-    "DocumentChunk"
+    "DocumentChunk",
+    "LLMVisualization"
 ]

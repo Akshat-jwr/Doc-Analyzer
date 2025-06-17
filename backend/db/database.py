@@ -33,13 +33,14 @@ async def connect_to_mongo():
         from models.chat_session import ChatMessage
         from auth.models import OTP
         from models.document_chunk import DocumentChunk
+        from models.llm_visualization import LLMVisualization  # Import if needed
         
         # Initialize Beanie
         await init_beanie(
             database=db.database,
             document_models=[
                 User, PDF, PageText, Table, Image, 
-                ChatSession, ChatMessage, OTP, DocumentChunk
+                ChatSession, ChatMessage, OTP, DocumentChunk, LLMVisualization
             ]
         )
         

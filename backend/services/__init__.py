@@ -1,8 +1,6 @@
-# CHANGE FROM:
+
 from .background_table_extractor import BackgroundTableExtractor, extract_tables_background
 
-# TO:
-from .background_table_extractor import BackgroundTableExtractor, extract_tables_background
 
 # And update the __all__ list:
 __all__ = [

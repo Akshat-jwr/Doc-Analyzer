@@ -42,7 +42,6 @@ class ChatResponseType:
     TEXT = "text"                    # General chat MD response
     ANALYSIS = "analysis"            # Analytical text response  
     TABLE_MODIFICATION = "table_modification"  # Modified table + download
-    VISUALIZATION = "visualization"  # Image/chart response
 
 # 📊 MARKDOWN TO EXCEL CONVERTER
 class MarkdownToExcelConverter:
