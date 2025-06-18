@@ -315,22 +315,40 @@ Generate the corrected Python code now."""
         return str(viz.id)
     
     async def get_history(self, user_id: str, document_id: Optional[str] = None, limit: int = 50) -> List[Dict]:
-        """Retrieves visualization history for a user, ensuring full data is returned."""
+        """
+        Retrieves visualization history, ensuring ALL necessary data,
+        including the image and selected tables, is returned for the frontend.
+        """
         try:
             search_criteria = {"user_id": PyObjectId(user_id)}
             if document_id:
                 search_criteria["document_id"] = PyObjectId(document_id)
-            
+
             history_cursor = LLMVisualization.find(search_criteria).sort(-LLMVisualization.created_at).limit(limit)
             history_list = await history_cursor.to_list()
-            
-            # ✅ THE FINAL FIX: Use `to_full_dict()` to ensure the image_base64
-            # and all other fields are included in the history response.
-            # This resolves both the missing image and the empty history issues.
-            return [viz.to_full_dict() for viz in history_list]
 
+            # ✅ THE DEFINITIVE FIX: Manually construct the response dictionary for each item.
+            # This is the most robust way to guarantee the frontend gets ALL the data it needs.
+            results = []
+            for viz in history_list:
+                results.append({
+                    "id": str(viz.id),
+                    "user_id": str(viz.user_id),
+                    "document_id": str(viz.document_id),
+                    "query": viz.query,
+                    "page_number": viz.page_number,
+                    "chart_type": viz.chart_type,
+                    "success": viz.success,
+                    "image_base64": viz.image_base64, # Included for the image
+                    "selected_tables": viz.selected_tables, # Included for the Excel button
+                    "llm_description": viz.llm_description,
+                    "created_at": viz.created_at.isoformat() if viz.created_at else None,
+                })
+
+            return results
         except Exception as e:
-            logger.error(f"Error getting visualization history: {e}", exc_info=True)
+            # This generic catch prevents the endpoint from crashing
+            logger.error(f"Error building visualization history response: {e}", exc_info=True)
             return []
         
 

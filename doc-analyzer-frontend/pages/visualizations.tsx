@@ -22,6 +22,8 @@ import {
   X, // ✅ NEW: Import X icon for the close button
   Search // ✅ NEW: Using a magnifying glass icon for the hover effect
 } from 'lucide-react';
+import { api } from '@/lib/api'; // Adjust the import path as needed
+import { toast } from 'react-hot-toast';
 
 // Types (remains the same)
 interface Visualization {
@@ -104,6 +106,7 @@ const VisualizationCard: React.FC<{ viz: Visualization; onDelete: (id: string)
     link.click();
     document.body.removeChild(link);
   };
+const [exporting, setExporting] = useState(false);
 
   const handleDownloadExcel = async () => {
     // Ensure there is a table to download
@@ -112,48 +115,28 @@ const VisualizationCard: React.FC<{ viz: Visualization; onDelete: (id: string)
       return;
     }
     
-    const tableToDownload = viz.selected_tables[0];
-    setIsDownloading(true);
+    const tableId = viz.selected_tables[0].id; // Use the first table for download
+    const title = viz.selected_tables[0].title || 'Visualization_Data';
 
-    try {
-      const token = localStorage.getItem('token');
-      // This endpoint is from your working `tables.py` file
-      const response = await fetch(`/api/tables/${tableToDownload.id}/export`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+    setExporting(true);
+        try {
+            console.log('Exporting table:', tableId);
+            const blob = await api.exportSingleTable(tableId);
 
-      if (!response.ok) {
-        throw new Error(`Failed to export table: ${response.statusText}`);
-      }
+            const url = URL.createObjectURL(blob);
+            const a = window.document.createElement('a');
+            a.href = url;
+            a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
 
-      // Logic to handle the file download, adapted from your TableView component
-      const disposition = response.headers.get('content-disposition');
-      let filename = `${tableToDownload.title.replace(/\s/g, '_') || 'table'}.xlsx`;
-      if (disposition && disposition.includes('attachment')) {
-        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-        const matches = filenameRegex.exec(disposition);
-        if (matches?.[1]) {
-          filename = matches[1].replace(/['"]/g, '');
+            toast.success('Table exported as Excel');
+        } catch (error: any) {
+            console.error('Export error:', error);
+            toast.error(error.message || 'Export failed');
+        } finally {
+            setExporting(false);
         }
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-      console.error("Excel Export Error:", error);
-      alert('Could not download the Excel file. Please try again.');
-    } finally {
-      setIsDownloading(false);
-    }
   };
 
   return (
@@ -196,7 +179,7 @@ const VisualizationCard: React.FC<{ viz: Visualization; onDelete: (id: string)
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary" icon={<ImageIcon className="w-4 h-4"/>} onClick={handleDownloadPNG} disabled={!viz.image_base64}>PNG</Button>
-            <Button size="sm" variant="secondary" icon={<FileText className="w-4 h-4"/>} onClick={handleDownloadExcel} disabled={!viz.python_code}>Data (Excel)</Button>
+            <Button size="sm" variant="secondary" icon={<FileText className="w-4 h-4"/>} onClick={handleDownloadExcel} disabled={!viz.selected_tables}>Data (Excel)</Button>
           </div>
           <Button size="sm" variant="ghost" className="text-gray-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => onDelete(viz.id)}>
             <Trash2 className="w-4 h-4" />
