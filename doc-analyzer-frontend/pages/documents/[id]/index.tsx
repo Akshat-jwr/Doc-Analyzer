@@ -52,6 +52,32 @@ const DocumentViewPage: React.FC = () => {
     );
   }
 
+  const getFileType = (filename?: string) => {
+    if (!filename) {
+      return 'unsupported';
+    }
+    
+    const extension = filename.split('.').pop()?.toLowerCase() || '';
+
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)) {
+      return 'image';
+    }
+    if (extension === 'pdf') {
+      return 'pdf';
+    }
+    if (['doc', 'docx'].includes(extension)) {
+      return 'document';
+    }
+    
+    return 'unsupported';
+  };
+
+
+  const fileUrl = documentData.document.cloudinary_url;
+  const fileType = getFileType(documentData.document.filename);
+
+
+
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'completed':
@@ -63,6 +89,53 @@ const DocumentViewPage: React.FC = () => {
         return { icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-400/20', text: 'Failed' };
       default:
         return { icon: Clock, color: 'text-yellow-400', bg: 'bg-yellow-400/20', text: 'Pending' };
+    }
+  };
+
+  const renderPreview = () => {
+    // We use the original, untouched `fileUrl` from the backend.
+    switch (fileType) {
+      case 'image':
+        // For images, a standard <img> tag is sufficient.
+        return (
+          <img
+            src={fileUrl}
+            alt={documentData.document.filename}
+            className="w-full h-full object-contain"
+          />
+        );
+
+      case 'pdf':
+      case 'document':
+        // For PDFs and Docs, we embed them using the Google Docs Viewer.
+        // This is the most reliable way to prevent forced downloads.
+        const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+        return (
+          <iframe
+            src={googleViewerUrl}
+            className="w-full h-full border-0"
+            title="Document Preview"
+            allow="fullscreen"
+          />
+        );
+      default:
+        // Fallback UI for unsupported types or missing filenames.
+        return (
+          <div className="w-full h-full flex items-center justify-center p-4">
+            <div className="text-center">
+              <FileText className="w-20 h-20 text-blue-400 mx-auto mb-4" />
+              <h4 className="text-lg font-semibold text-white mb-2">Preview Not Available</h4>
+              <p className="text-blue-300/70 mb-4">This file type does not support an inline preview.</p>
+              <Button
+                onClick={() => window.open(fileUrl, '_blank')}
+                icon={<Download />}
+                className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30"
+              >
+                Download File
+              </Button>
+            </div>
+          </div>
+        );
     }
   };
 
@@ -132,7 +205,7 @@ const DocumentViewPage: React.FC = () => {
               className="lg:col-span-2 space-y-6"
             >
               {/* Document Viewer */}
-              <div className="bg-gradient-to-br from-dark-800/50 to-dark-850/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-6 h-[600px] overflow-hidden">
+              <div className="bg-gradient-to-br from-dark-800/50 to-dark-850/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-6 h-[800px] overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white">Document Preview</h3>
                   <Button
@@ -147,29 +220,8 @@ const DocumentViewPage: React.FC = () => {
                 </div>
                 
                 {/* PDF Embed or Fallback */}
-                <div className="w-full h-full bg-dark-900/50 rounded-xl overflow-hidden border border-blue-500/10">
-                  {documentData.document.cloudinary_url.includes('.pdf') ? (
-                    <iframe
-                      src={`${documentData.document.cloudinary_url}#toolbar=0&navpanes=0&scrollbar=0`}
-                      className="w-full h-full"
-                      title="Document Preview"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <FileText className="w-20 h-20 text-blue-400 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold text-white mb-2">Preview Not Available</h4>
-                        <p className="text-blue-300/70 mb-4">This file type doesn't support preview</p>
-                        <Button
-                          onClick={() => window.open(documentData.document.cloudinary_url, '_blank')}
-                          icon={<Download />}
-                          className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30"
-                        >
-                          Download to View
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                <div className="w-full h-[calc(100%-40px)] bg-dark-900/50 rounded-xl overflow-hidden border border-blue-500/10">
+                  {renderPreview()}
                 </div>
               </div>
 

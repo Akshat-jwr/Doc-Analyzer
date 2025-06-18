@@ -7,6 +7,10 @@ import traceback
 import io
 import base64
 from typing import Dict, Any, Optional, List
+import seaborn as sns
+import datetime
+import math
+from scipy import stats
 
 # Matplotlib setup for a headless server environment
 import matplotlib
@@ -181,7 +185,7 @@ Generate the corrected Python code now."""
 
             plt.clf(); plt.close('all')
             # CRITICAL FIX 2: A flexible, curated list of safe built-ins to prevent NameErrors.
-            safe_builtins = {
+            SAFE_BUILTINS = {
                 'abs': abs, 'all': all, 'any': any, 'ascii': ascii, 'bin': bin, 'bool': bool,
                 'bytearray': bytearray, 'bytes': bytes, 'callable': callable, 'chr': chr,
                 'complex': complex, 'dict': dict, 'divmod': divmod, 'enumerate': enumerate,
@@ -194,10 +198,33 @@ Generate the corrected Python code now."""
                 'round': round, 'set': set, 'slice': slice, 'sorted': sorted, 'str': str,
                 'sum': sum, 'super': super, 'tuple': tuple, 'type': type, 'vars': vars, 'zip': zip
             }
+
+            # ✅ STEP 2: PROVIDE A RICH TOOLBOX OF PRE-APPROVED MODULES
+            # This gives the AI all the common tools for data visualization and analysis [3][5][7].
             safe_globals = {
-                'plt': plt, 'pd': pd, 'np': np, 'StringIO': StringIO, '__builtins__': safe_builtins,
-                'colors': colors,  # Allows calls like colors.ListedColormap
-                'cm': cm,          # Allows calls like cm.get_cmap
+                '__builtins__': SAFE_BUILTINS,  # Override built-ins with our safe list
+                
+                # Core Data Science & Plotting
+                'pd': pd,
+                'np': np,
+                'plt': plt,
+                'sns': sns,  # Seaborn is extremely common for statistical plots
+                
+                # In-memory file operations
+                'io': io,
+                'StringIO': StringIO,
+                'base64': base64,
+                
+                # Common Utilities
+                'datetime': datetime,
+                'math': math,
+                
+                # Advanced Statistics
+                'stats': stats, # from scipy.stats
+                
+                # Matplotlib specifics
+                'colors': colors,
+                'cm': cm,
             }
             safe_globals['table_1_data'] = tables_data[0]['content']
             
