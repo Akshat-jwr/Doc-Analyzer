@@ -51,9 +51,9 @@ class MultiChatService:
             raise ValueError("GOOGLE_API_KEY not found in environment variables")
             
         genai.configure(api_key=api_key)
-        self.llm_text = genai.GenerativeModel('gemini-1.5-pro-latest')
+        self.llm_text = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
         # ✅ FASTEST: Use Flash for image analysis (5x faster than Pro)
-        self.llm_vision = genai.GenerativeModel('gemini-1.5-flash')
+        self.llm_vision = genai.GenerativeModel('gemini-1.5-pro')
         
         # ✅ THREAD POOL: For parallel image processing
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=10)
@@ -1484,6 +1484,44 @@ EXECUTE ANALYSIS NOW:"""
                 "sessions_deleted": 0,
                 "messages_deleted": 0
             }
+        
+    
+    async def delete_chat_session(self, session_id: str, user_id: str) -> dict:
+        """
+        Safely deletes a chat session and all its associated messages,
+        preventing 500 Internal Server Errors.
+        """
+        try:
+            # Step 1: Find the session to ensure it exists and belongs to the user.
+            session_to_delete = await ChatSession.find_one(
+                ChatSession.session_id == session_id,
+                ChatSession.user_id == PyObjectId(user_id)
+            )
+
+            # Step 2: ✅ THE CRITICAL FIX: Check if the session was actually found.
+            # If not found, do not proceed. Return a clean 404 error instead of crashing.
+            if not session_to_delete:
+                logger.warning(f"Delete failed: Session '{session_id}' not found for user '{user_id}'.")
+                return {"success": False, "error": "Session not found."}
+
+            # Step 3: If the session exists, delete all associated messages first.
+            await ChatMessage.find(ChatMessage.session_id == session_id).delete()
+            
+            # Step 4: Now, delete the session object itself.
+            await session_to_delete.delete()
+            
+            logger.info(f"Successfully deleted session '{session_id}' and its messages.")
+            
+            # Step 5: Return a success response without trying to access the deleted object.
+            return {"success": True, "message": "Session and all associated messages deleted successfully."}
+
+        except Exception as e:
+            # This will catch any other unexpected database errors.
+            logger.error(f"Error during session deletion '{session_id}': {e}", exc_info=True)
+            return {"success": False, "error": "An internal server error occurred during deletion."}
+        
+
+    
     
     async def cleanup_document_data(self, document_id: str) -> Dict[str, Any]:
         """🧹 COMPLETE cleanup of document data (chats, chunks, etc.)"""
