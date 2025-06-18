@@ -1330,55 +1330,7 @@ EXECUTE ANALYSIS NOW:"""
             return f"I encountered an error while analyzing the data with conversation history: {str(e)}"
 
     
-    def _extract_table_from_response(self, response_text: str) -> Optional[str]:
-        """Extracts the first complete markdown table from a string using regex."""
-        # This regex looks for a block of lines that start and end with '|' and contain a header separator
-        match = re.search(r"((?:\|.*\|\s*\n)+)", response_text)
-        if match:
-            table_str = match.group(1).strip()
-            # Ensure it's a valid markdown table with a header separator row
-            if '|---|' in table_str or '|:--|' in table_str or '|--:|' in table_str:
-                logger.info(f"✅ Successfully extracted markdown table with {len(table_str.splitlines())} lines.")
-                return table_str
-        logger.warning("Could not extract a valid markdown table from the LLM response.")
-        return None
-    
-
-    async def _handle_table_modification(self, tables: List[Dict], query: str, page_number: Optional[int]) -> Dict[str, Any]:
-        """Detects and handles table modification requests, parsing the result perfectly."""
-        modification_keywords = ['change', 'modify', 'update', 'edit', 'add', 'remove', 'delete', 'swap', 'calculate']
-        if not any(keyword in query.lower() for keyword in modification_keywords):
-            return {"is_modification": False}
-
-        logger.info("🔄 Table modification request detected.")
-        # For a direct modification, conversation history is less critical than the raw instruction.
-        chat_history = "" 
-        llm_response_text = await self._generate_analytical_response_with_history(tables, query, page_number, chat_history, is_modification=True)
-
-        # Use the robust parser to get the table
-        modified_table_md = self._extract_table_from_response(llm_response_text)
-        
-        if not modified_table_md:
-            # If the LLM fails to produce a parsable table, return its raw text.
-            return {"is_modification": True, "analysis_text": llm_response_text, "modified_table_markdown": None, "download_id": None}
-
-        # Successfully parsed a table. The analysis text is everything before the table.
-        analysis_text = llm_response_text.split(modified_table_md)[0].strip()
-        if not analysis_text:
-            analysis_text = "Here is the modified table as requested."
-
-        # Create a unique ID for the download request
-        download_id = hashlib.md5(f"{query}_{datetime.now().isoformat()}".encode()).hexdigest()[:12]
-
-        return {
-            "is_modification": True,
-            "analysis_text": analysis_text,
-            "modified_table_markdown": modified_table_md,
-            "download_id": download_id
-        }
-
-
-
+  
     
     # ✅ SEARCH UTILITY
     async def _search_chunks(self, document_id: str, query_embedding: List[float], limit: int = 8) -> List[DocumentChunk]:

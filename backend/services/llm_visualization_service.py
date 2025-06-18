@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from io import StringIO
 import numpy as np
+from matplotlib import colors, cm
 
 # Pydantic and Database Models
 from pydantic import BaseModel, Field
@@ -35,7 +36,7 @@ class LLMVisualizationRequest(BaseModel):
 
 class LLMVisualizationService:
     """
-    🚀 A definitive, self-healing LLM Visualization Service.
+    ðŸš€ A definitive, self-healing LLM Visualization Service.
     This version fixes the TypeError and incorporates all best practices.
     """
     def __init__(self):
@@ -46,15 +47,15 @@ class LLMVisualizationService:
         self.llm = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
         try:
             self.llm.generate_content("Test", generation_config=genai.types.GenerationConfig(max_output_tokens=5))
-            logger.info("✅ LLM Visualization Service initialized successfully.")
+            logger.info("âœ… LLM Visualization Service initialized successfully.")
         except Exception as e:
-            logger.error(f"❌ LLM API test failed during initialization: {e}")
+            logger.error(f"âŒ LLM API test failed during initialization: {e}")
             raise
 
     async def create_visualization(self, request: LLMVisualizationRequest) -> Dict[str, Any]:
         start_time = time.time()
         try:
-            logger.info(f"🎨 New visualization request for page {request.page_number}: {request.query}")
+            logger.info(f"ðŸŽ¨ New visualization request for page {request.page_number}: {request.query}")
             document = await PDF.get(PyObjectId(request.document_id))
             if not document: return {"success": False, "error": "Document not found"}
             
@@ -64,7 +65,7 @@ class LLMVisualizationService:
             relevant_table = self._filter_and_select_best_table(tables, request.query)
             if not relevant_table: return {"success": False, "error": "No tables relevant to the query were found."}
             
-            logger.info(f"📊 Selected table: '{relevant_table['title']}' for visualization.")
+            logger.info(f"ðŸ“Š Selected table: '{relevant_table['title']}' for visualization.")
             
             viz_result = await self._generate_visualization_via_code_execution([relevant_table], request.query)
             
@@ -72,12 +73,12 @@ class LLMVisualizationService:
             
             processing_time = int((time.time() - start_time) * 1000)
             viz_id = await self._save_to_database(request, viz_result, [relevant_table], processing_time)
-            logger.info(f"✅ Visualization created successfully: {viz_id}")
+            logger.info(f"âœ… Visualization created successfully: {viz_id}")
             
             return { "success": True, "visualization": { "id": viz_id, **viz_result } }
             
         except Exception as e:
-            logger.error(f"❌ Unhandled error in create_visualization: {e}", exc_info=True)
+            logger.error(f"âŒ Unhandled error in create_visualization: {e}", exc_info=True)
             return {"success": False, "error": f"An unexpected server error occurred: {str(e)}"}
 
     async def _generate_visualization_via_code_execution(self, tables: List[Dict], query: str) -> Dict[str, Any]:
@@ -86,13 +87,13 @@ class LLMVisualizationService:
         max_attempts = 2
 
         for attempt in range(max_attempts):
-            logger.info(f"🚀 Visualization attempt {attempt + 1}/{max_attempts}...")
+            logger.info(f"ðŸš€ Visualization attempt {attempt + 1}/{max_attempts}...")
             
             try:
                 # This function call is now fixed and will no longer crash.
                 prompt = self._create_code_generation_prompt(tables, query, clean_python_code, last_error if attempt > 0 else None)
                 llm_response = await self._call_llm_api(prompt, timeout=60)
-                logger.info(f"🤖 Raw LLM Response (Attempt {attempt + 1}):\n---\n{llm_response}\n---")
+                logger.info(f"ðŸ¤– Raw LLM Response (Attempt {attempt + 1}):\n---\n{llm_response}\n---")
 
                 extracted_code = self._extract_python_code(llm_response)
                 if not extracted_code:
@@ -104,7 +105,7 @@ class LLMVisualizationService:
                 execution_result = await self._execute_python_visualization_safely(clean_python_code, tables)
 
                 if execution_result["success"]:
-                    logger.info("✅ Python code executed successfully!")
+                    logger.info("âœ… Python code executed successfully!")
                     description_prompt = f"Based on the user query '{query}', write a brief, one-sentence description of the chart created by the following Python code:\n\nCODE:\n{clean_python_code}"
                     description_response = await self._call_llm_api(description_prompt, timeout=20)
                     chart_type = self._determine_chart_type(clean_python_code, query)
@@ -124,7 +125,7 @@ class LLMVisualizationService:
         
         return {"success": False, "error": last_error, "python_code": clean_python_code}
 
-    # ✅ FIXED THE TypeError HERE.
+    # âœ… FIXED THE TypeError HERE.
     def _create_code_generation_prompt(self, tables: List[Dict], query: str, broken_code: Optional[str], error: Optional[str]) -> str:
         """Creates a prompt for the LLM using the user's improved version."""
         # THE BUG WAS HERE. `tables` is a list, so we must access the first element `tables[0]`.
@@ -194,7 +195,9 @@ Generate the corrected Python code now."""
                 'sum': sum, 'super': super, 'tuple': tuple, 'type': type, 'vars': vars, 'zip': zip
             }
             safe_globals = {
-                'plt': plt, 'pd': pd, 'np': np, 'StringIO': StringIO, '__builtins__': safe_builtins
+                'plt': plt, 'pd': pd, 'np': np, 'StringIO': StringIO, '__builtins__': safe_builtins,
+                'colors': colors,  # Allows calls like colors.ListedColormap
+                'cm': cm,          # Allows calls like cm.get_cmap
             }
             safe_globals['table_1_data'] = tables_data[0]['content']
             
@@ -209,7 +212,7 @@ Generate the corrected Python code now."""
             return {"success": True, "image_base64": f"data:image/png;base64,{img_base64}", "executed_code": sanitized_code}
         except Exception:
             error_trace = traceback.format_exc()
-            logger.error(f"❌ Python execution failed!\nCode Attempted (after sanitization):\n{sanitized_code}\nError:\n{error_trace}")
+            logger.error(f"âŒ Python execution failed!\nCode Attempted (after sanitization):\n{sanitized_code}\nError:\n{error_trace}")
             plt.close('all')
             return {"success": False, "error": error_trace}
         
@@ -274,7 +277,7 @@ Generate the corrected Python code now."""
             scored_tables.append((score, table))
         if not scored_tables: return None
         scored_tables.sort(key=lambda x: x[0], reverse=True)
-        logger.info(f"🏆 Top table candidate: {scored_tables[0][1]['title']} (Score: {scored_tables[0][0]})")
+        logger.info(f"ðŸ† Top table candidate: {scored_tables[0][1]['title']} (Score: {scored_tables[0][0]})")
         return scored_tables[0][1]
 
     async def _call_llm_api(self, prompt: str, timeout: int) -> str:
@@ -312,7 +315,7 @@ Generate the corrected Python code now."""
         return str(viz.id)
     
     async def get_history(self, user_id: str, document_id: Optional[str] = None, limit: int = 50) -> List[Dict]:
-        """Retrieves visualization history for a user, optionally filtered by document."""
+        """Retrieves visualization history for a user, ensuring full data is returned."""
         try:
             search_criteria = {"user_id": PyObjectId(user_id)}
             if document_id:
@@ -321,10 +324,15 @@ Generate the corrected Python code now."""
             history_cursor = LLMVisualization.find(search_criteria).sort(-LLMVisualization.created_at).limit(limit)
             history_list = await history_cursor.to_list()
             
-            return [viz.to_dict() for viz in history_list]
+            # ✅ THE FINAL FIX: Use `to_full_dict()` to ensure the image_base64
+            # and all other fields are included in the history response.
+            # This resolves both the missing image and the empty history issues.
+            return [viz.to_full_dict() for viz in history_list]
+
         except Exception as e:
-            logger.error(f"Error getting visualization history: {e}")
+            logger.error(f"Error getting visualization history: {e}", exc_info=True)
             return []
+        
 
     async def get_details(self, viz_id: str, user_id: str) -> Dict[str, Any]:
         """Retrieves full details for a single visualization, including the image."""

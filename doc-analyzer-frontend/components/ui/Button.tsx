@@ -1,5 +1,4 @@
 // components/ui/Button.tsx
-
 import React from 'react';
 import { motion, HTMLMotionProps } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -8,7 +7,8 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
   /** Button label or content */
   children?: React.ReactNode;
   /** Visual style variant */
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  // ✅ THE FIX 1: Add 'outline' as a valid variant type
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
   /** Size of the button */
   size?: 'sm' | 'md' | 'lg';
   /** Show a loading spinner and disable clicks */
@@ -37,6 +37,9 @@ export const Button: React.FC<ButtonProps> = ({
       'bg-dark-700 hover:bg-dark-600 text-white focus:ring-dark-500 border border-dark-600',
     danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500',
     ghost: 'text-dark-300 hover:text-white hover:bg-dark-800 focus:ring-dark-500',
+    // ✅ THE FIX 2: Add the styles for the new 'outline' variant
+    outline:
+      'border border-dark-600 text-dark-300 hover:bg-dark-800 hover:text-white focus:ring-dark-500',
   } as const;
 
   const sizes = {
@@ -49,7 +52,6 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <motion.button
-      // Only apply hover/tap animations if not disabled
       whileHover={!isDisabled ? { scale: 1.02 } : undefined}
       whileTap={!isDisabled ? { scale: 0.98 } : undefined}
       className={clsx(

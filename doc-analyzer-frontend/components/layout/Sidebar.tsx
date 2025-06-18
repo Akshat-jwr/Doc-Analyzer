@@ -27,6 +27,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { icon: Home, label: 'Dashboard', href: '/' },
     { icon: FileText, label: 'Documents', href: '/documents' },
     { icon: MessageSquare, label: 'AI Chat', href: '/chat' },
+    { icon: Upload, label: 'Visualizations', href: '/visualizations' },
+
   ];
 
   const handleNavigation = (href: string) => {
