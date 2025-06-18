@@ -258,6 +258,7 @@ Generate the corrected Python code now."""
         return '\n'.join(sanitized_lines)
 
 
+
     def _extract_python_code(self, response_text: str) -> Optional[str]:
         """A robust function to extract Python code from a markdown block."""
         if not response_text: return None

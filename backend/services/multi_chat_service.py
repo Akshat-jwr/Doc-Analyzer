@@ -342,56 +342,58 @@ EXECUTE MODIFICATION NOW:"""
             response = self.llm_text.generate_content(modification_prompt)
             modification_result = response.text
             
-            # Extract the new table from the response
+            # 1. Extract the clean Markdown table from the full text response.
             new_table_md = self._extract_table_from_response(modification_result)
-            
-            # Generate download ID
+            if not new_table_md:
+                # If extraction fails, return the full text but flag it.
+                logger.error("Failed to extract Markdown table from LLM response.")
+                return {"is_modification": False, "analysis_text": "I tried to modify the table, but there was a formatting error."}
+
+            # 2. Extract the summary text (everything EXCEPT the table).
+            analysis_text = modification_result.replace(new_table_md, "").strip()
+
+            # 3. Generate a unique ID for the download.
             download_id = hashlib.md5(f"{query}_{datetime.now().isoformat()}".encode()).hexdigest()[:12]
-            
-            return {
-            "is_modification": True,
-            "analysis_text": "Table modification completed successfully.",  # ✅ Clean analysis
-            "modified_table_markdown": new_table_md,  # ✅ Separate table MD
-            "download_id": download_id,
-            "download_ready": True,
-            "modification_summary": "Added profit margin column and calculated percentages."  # ✅ Summary
-        }
-            
-        except Exception as e:
-            logger.error(f"Error in table modification: {e}")
+
+            # 4. Return a structured dictionary for the API layer to use.
             return {
                 "is_modification": True,
-                "analysis": f"Failed to modify table: {str(e)}",
-                "new_table_markdown": None,
-                "download_id": None,
-                "download_ready": False
+                "analysis_text": analysis_text,          # The human-readable summary.
+                "modified_table_markdown": new_table_md, # The pure, clean Markdown table.
+                "download_id": download_id,
+                "download_ready": True,
             }
+            
+        except Exception as e:
+            logger.error(f"Error in table modification: {e}", exc_info=True)
+            return { "is_modification": False, "analysis_text": f"Failed to modify table: {str(e)}" }
+        
+
+
     
     def _extract_table_from_response(self, response: str) -> Optional[str]:
-        """Extract markdown table from LLM response"""
+        """Extract markdown table from LLM response using regex for better accuracy."""
         try:
-            lines = response.split('\n')
-            table_lines = []
-            in_table = False
-            
-            for line in lines:
-                if '|' in line and not in_table:
-                    in_table = True
-                    table_lines.append(line)
-                elif '|' in line and in_table:
-                    table_lines.append(line)
-                elif in_table and '|' not in line.strip():
-                    # End of table
-                    break
-            
-            if table_lines:
+            # This regex looks for a block that starts with "Modified Table:"
+            # and captures everything until the next major section like "Change Log:" or end of string.
+            match = re.search(r"Modified Table:\n(.+?)(?=\n\n\w+|\Z)", response, re.DOTALL)
+            if match:
+                table_md = match.group(1).strip()
+                # Further clean up just in case
+                table_lines = [line.strip() for line in table_md.split('\n') if '|' in line]
                 return '\n'.join(table_lines)
             
+            # Fallback for simpler cases if regex fails
+            lines = response.split('\n')
+            table_lines = [line for line in lines if line.strip().startswith('|')]
+            if table_lines:
+                return '\n'.join(table_lines)
+
             return None
-            
         except Exception as e:
             logger.error(f"Error extracting table: {e}")
             return None
+        
     
     async def _generate_analytical_response(self, tables_data: List[Dict], query: str, page_number: Optional[int], analysis_method: str) -> str:
         """📈 Generate comprehensive analytical response"""
@@ -1249,34 +1251,64 @@ Provide comprehensive answer using all available content:"""
                 all_tables = await Table.find(Table.pdf_id == PyObjectId(session.document_id)).to_list()
                 tables_data = [{'id': str(t.id), 'title': t.table_title, 'markdown_content': t.markdown_content, 'row_count': t.row_count, 'column_count': t.column_count, 'start_page': t.start_page, 'end_page': t.end_page} for t in all_tables]
 
-            if not tables_data:
-                # Fallback to image analysis if no DB tables found
-                response_text = await self._analyze_page_image_for_tables(str(session.document_id), page_number, clean_query) if page_number else "No tables found in the document to analyze."
+            response_payload = {}
+            # Check for modification intent
+            modification_keywords = ['change', 'modify', 'update', 'edit', 'add', 'remove', 'delete', 'replace']
+            if any(keyword in message.lower() for keyword in modification_keywords) and tables_data:
+                # This is a modification request
+                modification_result = await self._handle_table_modification(tables_data, message, page_number)
+                
+                # ✅ THE FIX: Construct the final response payload from the structured result.
+                if modification_result.get("is_modification"):
+                    response_payload = {
+                        "success": True,
+                        # Combine the summary and the table for display in the chat.
+                        "response": f"{modification_result['analysis_text']}\n\n{modification_result['modified_table_markdown']}",
+                        "metadata": {
+                            "chat_type": "analytical",
+                            "response_type": "table_modification", # New flag for the frontend
+                            "is_modification": True,
+                            "download_ready": True,
+                            "show_download_button": True, # New flag for the frontend
+                            "download_id": modification_result['download_id'],
+                            "new_table_markdown": modification_result['modified_table_markdown'], # Pass clean MD for storage
+                        }
+                    }
+                else:
+                    response_payload = {"success": True, "response": modification_result.get("analysis_text", "An error occurred."), "metadata": {}}
             else:
-                # ✅ THE FIX: This call will now succeed because the function is implemented below.
-                response_text = await self._generate_analytical_response_with_history(
-                    tables_data, clean_query, page_number, chat_history
-                )
+                # Regular analysis
+                if not tables_data:
+                    # Fallback to image analysis
+                    response_text = await self._analyze_page_image_for_tables(str(session.document_id), page_number, message) if page_number else "No tables found to analyze."
+                else:
+                    chat_history = await self._get_optimized_analytical_history(session.session_id)
+                    response_text = await self._generate_analytical_response_with_history(tables_data, message, page_number, chat_history)
+                response_payload = {"success": True, "response": response_text, "metadata": {"chat_type": "analytical"}}
 
             # Save assistant message
             assistant_message = ChatMessage(
                 session_id=session.session_id, user_id=PyObjectId(user_id),
                 document_id=session.document_id, chat_type=ChatType.ANALYTICAL,
-                role="assistant", content=response_text
+                role="assistant", content=response_payload['response'],
+                metadata=response_payload.get('metadata') # Save the rich metadata
             )
             await assistant_message.insert()
-            
+
             # Update session
             session.updated_at = datetime.now()
             session.last_activity = datetime.now()
             session.message_count += 2
             await session.save()
-            
-            return {"success": True, "response": response_text, "metadata": {"chat_type": "analytical"}}
+
+            return response_payload
 
         except Exception as e:
             logger.error(f"Error in enhanced analytical chat: {e}", exc_info=True)
             return {"success": False, "error": str(e), "response": "I encountered an error processing your analytical request."}
+        
+
+        
 
     # -------------------------------------------------------------------------
     # ✅ NEW: IMPLEMENTATION OF THE MISSING FUNCTION

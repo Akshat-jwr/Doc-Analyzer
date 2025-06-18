@@ -5,10 +5,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm'
 import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
+import { FixedSizeList as List } from 'react-window';
 import { useDocuments } from '@/hooks/useDocuments';
 import { 
   Send, 
@@ -67,6 +69,50 @@ const formatISTDate = (isoDate: string) => {
   }
 };
 
+const VirtualizedTable: React.FC<{ markdown: string }> = ({ markdown }) => {
+  // 1. Parse the markdown string into headers and rows
+  const lines = markdown.trim().split('\n');
+  const headers = lines[0].split('|').map(h => h.trim()).slice(1, -1);
+  // Filter out the separator line ' |---|---| '
+  const rows = lines.slice(2).map(line => line.split('|').map(cell => cell.trim()).slice(1, -1));
+
+  // 2. Define the Row component that react-window will render
+  const Row = ({ index, style }: { index: number, style: React.CSSProperties }) => (
+    <div style={style} className="flex items-center border-b border-blue-500/20">
+      {rows[index].map((cell, cellIndex) => (
+        <div key={cellIndex} className="p-2 text-sm flex-1 min-w-[150px] truncate">
+          {cell}
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="bg-dark-900/50 border border-blue-500/30 rounded-lg overflow-hidden">
+      {/* Fixed Header */}
+      <div className="flex items-center bg-dark-700 font-bold text-white/90 sticky top-0 z-10">
+        {headers.map((header, index) => (
+          <div key={index} className="p-2 text-sm flex-1 min-w-[150px]">
+            {header}
+          </div>
+        ))}
+      </div>
+      
+      {/* Virtualized List Container */}
+      <div className="w-full h-[400px]"> {/* Fixed height for the scrollable area */}
+        <List
+          height={400} // The height of the list viewport
+          itemCount={rows.length} // Total number of rows
+          itemSize={40} // The height of a single row in pixels
+          width="100%" // Take the full width of the parent
+        >
+          {Row}
+        </List>
+      </div>
+    </div>
+  );
+};
+
 // --- Reusable UI Components ---
 
 const MessageBubble: React.FC<{ message: ChatMessage; onDownload: (id: string) => void }> = ({ message, onDownload }) => {
@@ -89,23 +135,53 @@ const MessageBubble: React.FC<{ message: ChatMessage; onDownload: (id: string) =
     );
   }
 
+  const cleanContent = message.content.replace(/(\r\n|\n|\r)/gm, "\n").replace(/(\|---\|.*\|)(\s*\|)/g, '$1\n$2');
+
+  // --- KEY LOGIC CHANGE ---
+  // Heuristic: If a message has more than 20 lines and contains table syntax,
+  // we assume it's a large table and use the virtualized renderer.
+  const isLargeTable = cleanContent.split('\n').length > 20 && cleanContent.includes('|---|');
+
+
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex items-start gap-3 ${isUser ? 'justify-end' : ''}`}>
-      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${isUser ? 'bg-blue-600' : 'bg-dark-700'}`}>
-        {isUser ? <User className="w-4 h-4 text-white" /> : <Bot className="w-5 h-5 text-blue-400" />}
-      </div>
-      <div className={`max-w-2xl rounded-2xl p-4 ${isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-dark-800 border border-blue-500/20 text-blue-100 rounded-bl-none'}`}>
-        <ReactMarkdown className="prose prose-invert prose-sm max-w-none">{message.content}</ReactMarkdown>
-        {message.metadata?.show_download_button && message.metadata.download_id && (
-          <div className="mt-4 pt-4 border-t border-blue-500/30">
-            <Button size="sm" variant="secondary" icon={<Download className="w-4 h-4" />} onClick={() => onDownload(message.metadata!.download_id!)}>
-              Download Data (Excel)
-            </Button>
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
+  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex items-start gap-3 ${isUser ? 'justify-end' : ''}`}>
+    {!isUser && (
+        <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-dark-700">
+          <Bot className="w-5 h-5 text-blue-400" />
+        </div>
+    )}
+    <div className={`max-w-3xl rounded-2xl p-4 ${isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-dark-800 border border-blue-500/20 text-blue-100 rounded-bl-none'}`}>
+      {
+        // Heuristic: If a message has more than 20 lines and contains table syntax,
+        // we assume it's a large table and use the virtualized renderer.
+        cleanContent.split('\n').length > 20 && cleanContent.includes('|---|') ? (
+          <VirtualizedTable markdown={cleanContent} />
+        ) : (
+          <ReactMarkdown
+            className="prose prose-invert prose-sm max-w-none prose-table:w-full prose-table:table-auto prose-th:text-left prose-th:bg-dark-700 prose-th:p-2 prose-td:p-2 prose-tr:border-b prose-tr:border-blue-500/20"
+            remarkPlugins={[remarkGfm]}
+          >
+            {cleanContent}
+          </ReactMarkdown>
+        )
+      }
+
+      {/* This logic will still work perfectly for the download button */}
+      {message.metadata?.show_download_button && message.metadata.download_id && (
+        <div className="mt-4 pt-4 border-t border-blue-500/30">
+          <Button size="sm" variant="secondary" icon={<Download className="w-4 h-4" />} onClick={() => onDownload(message.metadata!.download_id!)}>
+            Download Modified Table (Excel)
+          </Button>
+        </div>
+      )}
+    </div>
+     {isUser && (
+        <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-blue-600">
+          <User className="w-4 h-4 text-white" />
+        </div>
+    )}
+  </motion.div>
+);
 };
 
 const NewChatModal: React.FC<{
