@@ -652,12 +652,18 @@ Visual content from page {image.page_number}."""
                 DocumentChunk.document_id == document_id,
                 DocumentChunk.content_type == "text"
             ).count()
+            image_count = await Image.find(
+                Image.pdf_id == PyObjectId(document_id)
+            ).count()
+            table_count = await Table.find(
+                Table.pdf_id == PyObjectId(document_id)
+            ).count()
             
-            if text_chunk_count == 0:
+            if text_chunk_count == 0 and image_count == 0 and table_count == 0:
                 logger.warning(f"⚠️ Document {document_id} has no page-wise text chunks")
                 return False
             else:
-                logger.info(f"✅ Document {document_id} has {text_chunk_count} text chunks - ready")
+                logger.info(f"✅ Document is ready")
                 return True
                 
         except Exception as e:
