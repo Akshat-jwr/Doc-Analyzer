@@ -14,7 +14,7 @@ import time
 from pdf2image import convert_from_path
 import magic
 
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 from utils.pydantic_objectid import PyObjectId
 from models.pdf import PDF, ProcessingStatus
