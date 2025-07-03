@@ -39,12 +39,12 @@ PyJWT==2.8.0
 python-magic==0.4.27
 
 # SSL & networking
-certifi==2024.6.1
+certifi==2024.12.14
 urllib3==1.26.18
 
 # Data Science & Visualization
 matplotlib==3.8.0
-scipy==1.13.0
+scipy==1.13.1
 numpy==1.26.4
 
 # Excel & data processing
@@ -70,7 +70,7 @@ sentence-transformers==3.0.1
 tokenizers==0.19.1
 
 # Vector store
-chromadb==0.5.5
+chromadb==0.5.20
 
 # PyTorch ecosystem
 torch==2.4.0
