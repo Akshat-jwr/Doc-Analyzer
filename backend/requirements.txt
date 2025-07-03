@@ -8,9 +8,11 @@ sqlmodel==0.0.14
 asyncpg==0.29.0
 alembic==1.13.0
 psycopg2-binary==2.9.9
+beanie==1.22.0
+motor==3.1.1
 
 # PDF Processing - Updated versions
-PyMuPDF==1.23.26
+PyMuPDF<1.24
 pdf2image==1.17.0
 pytesseract==0.3.10
 pillow==10.4.0  # Updated for Python 3.13 support
@@ -49,7 +51,6 @@ langchain-text-splitters==0.3.0
 langsmith==0.1.147
 
 # Google GenAI - Latest
-google-generativeai==0.8.3
 langchain-google-genai==2.0.4
 
 # HuggingFace ecosystem
