@@ -98,15 +98,40 @@ async def debug_full_document_content(document_id: str):
     # 4. Simulate proper chunking
     print(f"\n🔪 TESTING CHUNKING:")
     
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    # Simple text splitter without LangChain
+    def simple_text_splitter(text, chunk_size=1200, chunk_overlap=300):
+        """Simple text splitter without LangChain dependency"""
+        separators = ["\n\n", "\n", ". ", "! ", "? ", "; ", " "]
+        chunks = []
+        
+        def split_by_separator(text, separators):
+            if not separators:
+                return [text]
+            
+            separator = separators[0]
+            parts = text.split(separator)
+            
+            if len(parts) == 1:
+                return split_by_separator(text, separators[1:])
+            
+            result = []
+            for part in parts:
+                if len(part) > chunk_size and len(separators) > 1:
+                    result.extend(split_by_separator(part, separators[1:]))
+                else:
+                    result.append(part)
+            return result
+        
+        raw_chunks = split_by_separator(text, separators)
+        
+        # Combine small chunks and handle overlap
+        for chunk in raw_chunks:
+            if len(chunk.strip()) > 50:  # Skip very small chunks
+                chunks.append(chunk.strip())
+        
+        return chunks
     
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1200,
-        chunk_overlap=300,
-        separators=["\n\n", "\n", ". ", "! ", "? ", "; ", " ", ""]
-    )
-    
-    chunks = splitter.split_text(complete_text)
+    chunks = simple_text_splitter(complete_text)
     
     print(f"📊 CHUNKING RESULTS:")
     print(f"   Number of chunks: {len(chunks)}")
