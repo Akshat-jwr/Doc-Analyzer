@@ -1,78 +1,58 @@
 # Core Framework
-fastapi<0.100.0
-uvicorn[standard]==0.23.1
+fastapi==0.99.1
+uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # Database
-sqlmodel==0.0.8
-asyncpg==0.28.0
-alembic==1.11.1
-psycopg2-binary==2.9.6
+sqlmodel==0.0.14
+asyncpg==0.29.0
+alembic==1.13.0
+psycopg2-binary==2.9.9
 
-# PDF Processing
-PyMuPDF==1.22.5
-pdf2image==1.16.3
+# PDF Processing - Updated versions
+PyMuPDF==1.23.26
+pdf2image==1.17.0
 pytesseract==0.3.10
-pillow==10.0.0
+pillow==10.4.0  # Updated for Python 3.13 support
 
 # Cloud Storage
-cloudinary==1.33.0
+cloudinary==1.40.0
 
 # AI Integration
-google-generativeai==0.3.1
+google-generativeai==0.8.3
 
 # Utilities
 python-dotenv==1.0.0
-aiofiles==23.1.0
-pydantic==1.10.8
-tqdm==4.65.0
+aiofiles==23.2.0
+pydantic==2.9.2
+tqdm==4.66.0
 requests==2.31.0
-
-# PDF Processing Components
-poppler-utils==0.1.0  # System dependency for pdf2image
-tesseract-ocr<5.3.0  # System dependency for pytesseract
 
 # Development Tools
 pytest==7.4.0
-pytest-asyncio==0.21.0
-black==23.3.0
-isort==5.12.0
-mypy==1.4.1
+pytest-asyncio==0.23.0
+black==24.0.0
+isort==5.13.0
+mypy==1.8.0
 
-# PDF Processing
-PyMuPDF==1.22.5
-pdf2image==1.16.3
-pytesseract==0.3.10
-pillow==10.0.0
-
-# Cloudinary
-cloudinary==1.33.0
-
-# Google AI
-google-generativeai==0.3.1
-
-PyCryptodome>=3.15.0
-
-pandas>=1.5.0          # For spreadsheet processing
-openpyxl>=3.0.0        # For Excel files (.xlsx)
-xlrd>=2.0.0            # For older Excel files (.xls)
-tabulate>=0.9.0        # For markdown table formatting
+# Updated pandas/excel processing
+pandas==2.2.0
 openpyxl==3.1.2
-pandas==2.1.4
+xlrd==2.0.1
+tabulate==0.9.0
 
-# STABLE WORKING COMBINATION (2025 tested)
-# Core LangChain - MUST stay on 0.2.x family
-langchain-core==0.2.43
-langchain==0.2.16
-langchain-community==0.2.16
-langchain-text-splitters==0.2.4
+# STABLE WORKING COMBINATION - Updated for Python 3.13
+langchain-core==0.3.0
+langchain==0.3.0
+langchain-community==0.3.0
+langchain-text-splitters==0.3.0
 langsmith==0.1.147
 
-# Google GenAI - Latest compatible
+# Google GenAI - Latest
 google-generativeai==0.8.3
 langchain-google-genai==2.0.4
 
-# HuggingFace ecosystem - Stable versions
+# HuggingFace ecosystem
 huggingface-hub==0.26.2
 transformers==4.45.0
 sentence-transformers==3.2.1
@@ -81,16 +61,12 @@ tokenizers==0.20.4
 # Vector store
 chromadb==0.5.20
 
-# Pydantic - Stable v2
-pydantic==2.9.2
-pydantic-core==2.27.1
-
-# PyTorch - Stable CPU versions
-torch==2.1.0
-torchvision==0.16.0
-torchaudio==2.1.0
+# PyTorch - Updated
+torch==2.4.0
+torchvision==0.19.0
+torchaudio==2.4.0
 
 # Utilities
 tiktoken==0.8.0
-numpy==1.24.3
-
+numpy==1.26.0
+PyCryptodome>=3.20.0
