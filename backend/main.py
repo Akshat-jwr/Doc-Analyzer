@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,13 +20,43 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Configure CORS origins
+def get_cors_origins():
+    """Get CORS origins based on environment"""
+    # Development origins
+    origins = [
+        "http://localhost:3000",
+        "http://localhost:3001", 
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+    
+    # Production origins - Your Vercel deployment
+    origins.extend([
+        "https://doc-analyzer-omega.vercel.app",
+        "https://doc-analyzer-omega-*.vercel.app",  # Preview deployments
+    ])
+    
+    # Additional production origins from environment
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url:
+        origins.append(frontend_url)
+    
+    # Add custom domains from environment
+    custom_domains = os.getenv("ALLOWED_ORIGINS", "").split(",")
+    origins.extend([domain.strip() for domain in custom_domains if domain.strip()])
+    
+    logger.info(f"CORS Origins: {origins}")
+    return origins
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Event handlers
@@ -58,6 +89,16 @@ app.include_router(pdf_router)
 app.include_router(tables_router)
 app.include_router(multi_chat_router)  # ✅ ADD THIS
 app.include_router(visualization_router)  # ✅ ADD THIS
+
+# Debug endpoint for CORS testing
+@app.get("/api/v1/cors-test")
+async def cors_test():
+    """Test endpoint to verify CORS is working"""
+    return {
+        "message": "CORS is working!",
+        "timestamp": "2025-07-03T00:00:00Z",
+        "allowed_origins": get_cors_origins()
+    }
 
 # Root endpoint
 @app.get("/", tags=["Root"])
