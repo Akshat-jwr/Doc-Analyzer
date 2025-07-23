@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 
 from auth import auth_service, get_current_active_user
+from auth.otp_service import otp_service
 from models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -96,3 +97,30 @@ async def get_current_user_info(
 async def logout(current_user: User = Depends(get_current_active_user)):
     """Logout user (client should delete tokens)"""
     return {"message": "Logged out successfully"}
+
+# ✅ DEBUG ENDPOINTS (Remove in production)
+@router.get("/debug/email-config")
+async def debug_email_config():
+    """🔧 DEBUG: Get email configuration (no sensitive data)"""
+    return await otp_service.test_email_connection()
+
+@router.post("/debug/test-email")
+async def debug_test_email(request: SendOTPRequest):
+    """🧪 DEBUG: Send test email"""
+    return await otp_service.send_test_email(request.email)
+
+@router.get("/debug/email-stats")
+async def debug_email_stats():
+    """📊 DEBUG: Get email service statistics"""
+    try:
+        from services.background_email_service import background_email_service
+        return {
+            "success": True,
+            "stats": background_email_service.get_stats(),
+            "config": (await otp_service.test_email_connection()).get("config", {})
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }

@@ -48,7 +48,7 @@ class LLMVisualizationService:
         if not api_key:
             raise ValueError("GOOGLE_API_KEY not found")
         genai.configure(api_key=api_key)
-        self.llm = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
+        self.llm = genai.GenerativeModel('gemini-2.5-flash')
         try:
             self.llm.generate_content("Test", generation_config=genai.types.GenerationConfig(max_output_tokens=5))
             logger.info("âœ… LLM Visualization Service initialized successfully.")

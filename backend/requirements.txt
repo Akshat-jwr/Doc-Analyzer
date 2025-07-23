@@ -41,6 +41,9 @@ requests==2.31.0
 # Authentication
 PyJWT==2.8.0
 
+# Email
+aiosmtplib==3.0.2
+
 # File type detection
 python-magic==0.4.27
 

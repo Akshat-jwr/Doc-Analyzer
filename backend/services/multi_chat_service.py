@@ -51,7 +51,7 @@ class MultiChatService:
             raise ValueError("GOOGLE_API_KEY not found in environment variables")
             
         genai.configure(api_key=api_key)
-        self.llm_text = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
+        self.llm_text = genai.GenerativeModel('gemini-2.5-flash')
         # ✅ FASTEST: Use Flash for image analysis (5x faster than Pro)
         self.llm_vision = genai.GenerativeModel('gemini-1.5-pro')
         
@@ -1119,12 +1119,7 @@ Structured data from page {table_page}."""
                     
                     context = "\n".join(context_parts)
                     
-                    system_prompt = """You are an advanced document analysis assistant.
-
-CAPABILITIES:
-- Analyze text, images, and tables with ultra-fast parallel processing
-- Provide comprehensive answers citing page numbers
-- Combine textual and visual information effectively
+                    system_prompt = """You are a helpful assistant
 
 GUIDELINES:
 1. Base answers on provided content (text + images + tables)
@@ -1132,8 +1127,8 @@ GUIDELINES:
 3. Always cite page numbers
 4. Be detailed and thorough
 5. Combine all information sources
-
-Ultra-fast parallel processing ensures comprehensive analysis."""
+6. If you do not find relevant answer based on the context, then inform the user that it is not in the context and give a correct answer by yourself
+"""
 
                     full_prompt = f"""{system_prompt}
 
@@ -1141,7 +1136,7 @@ Ultra-fast parallel processing ensures comprehensive analysis."""
 
 Question: {message}
 
-Provide comprehensive answer using all available content:"""
+Provide comprehensive answer using all available content and your intelligence:"""
                     
                     # Generate response
                     try:

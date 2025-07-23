@@ -62,11 +62,19 @@ app.add_middleware(
 # Event handlers
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database and chatbot on startup"""
+    """Initialize database and services on startup"""
     logger.info("Starting up and connecting to MongoDB...")
     try:
         await connect_to_mongo()
         logger.info("Successfully connected to MongoDB!")
+        
+        # ✅ START BACKGROUND EMAIL SERVICE
+        try:
+            from services.background_email_service import background_email_service
+            await background_email_service.start_background_worker()
+            logger.info("✅ Background email service started!")
+        except Exception as e:
+            logger.warning(f"⚠️ Background email service failed to start: {e}")
         
         # Initialize chatbot service
         # from backend.services.multi_chat_service import general_chatbot_service
@@ -78,8 +86,17 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close database connection on shutdown"""
+    """Close database connection and services on shutdown"""
     logger.info("Shutting down and closing MongoDB connection...")
+    
+    # ✅ STOP BACKGROUND EMAIL SERVICE
+    try:
+        from services.background_email_service import background_email_service
+        await background_email_service.stop()
+        logger.info("✅ Background email service stopped!")
+    except Exception as e:
+        logger.warning(f"⚠️ Error stopping background email service: {e}")
+    
     await close_mongo_connection()
 
 # Include routers

@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any
 import logging
+import asyncio
 from utils.pydantic_objectid import PyObjectId
 
 from models.user import User
@@ -11,27 +12,52 @@ logger = logging.getLogger(__name__)
 class AuthService:
     
     async def send_login_otp(self, email: str) -> Dict[str, Any]:
-        """Send OTP for login/registration"""
+        """Send OTP for login/registration with timeout protection"""
         try:
-            # Create OTP
+            # Create OTP first (this is fast)
             otp_code = await otp_service.create_otp(email, purpose="login")
             
-            # Send email
-            email_sent = await otp_service.send_otp_email(email, otp_code, purpose="login")
-            
-            if email_sent:
+            # Try to send email with timeout protection
+            try:
+                email_sent = await asyncio.wait_for(
+                    otp_service.send_otp_email(email, otp_code, purpose="login"),
+                    timeout=10.0  # 10 second timeout for API response
+                )
+                
+                if email_sent:
+                    return {
+                        "success": True,
+                        "message": "OTP sent successfully to your email"
+                    }
+                else:
+                    # Email failed but don't block API response
+                    logger.warning(f"Direct email failed for {email}, OTP still created")
+                    return {
+                        "success": True,
+                        "message": "OTP created. If you don't receive it, please try again.",
+                        "note": "Email delivery may be delayed"
+                    }
+                    
+            except asyncio.TimeoutError:
+                # Email is taking too long - don't block the API response
+                logger.warning(f"Email timeout for {email}, but OTP created")
+                
+                # Try background sending as fallback
+                try:
+                    from services.background_email_service import background_email_service
+                    await background_email_service.queue_email(email, otp_code, "login")
+                    logger.info(f"Email queued for background delivery to {email}")
+                except:
+                    pass  # Background service failed too, but don't break the flow
+                
                 return {
                     "success": True,
-                    "message": "OTP sent successfully to your email"
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": "Failed to send OTP. Please try again."
+                    "message": "OTP created. Email delivery in progress...",
+                    "note": "If you don't receive the email within 2 minutes, please try again"
                 }
                 
         except Exception as e:
-            logger.error(f"Error sending login OTP: {e}")
+            logger.error(f"Error in send_login_otp: {e}")
             return {
                 "success": False,
                 "message": "An error occurred. Please try again."
